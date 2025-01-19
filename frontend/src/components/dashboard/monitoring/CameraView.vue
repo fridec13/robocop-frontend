@@ -50,13 +50,14 @@ const streamInfo = ref(null);
 
 const requestPermission = async () => {
   try {
-    console.log('카메라 권한 요청 시작');
-    
+    if (!navigator.mediaDevices) {
+      throw new Error('이 브라우저는 카메라 접근을 지원하지 않습니다.');
+    }
+
     // 기존 스트림이 있다면 정리
     if (stream.value) {
       stream.value.getTracks().forEach(track => {
         track.stop();
-        console.log('기존 카메라 트랙 정지됨');
       });
     }
 
@@ -69,41 +70,33 @@ const requestPermission = async () => {
       }
     });
     
-    // 스트림 정보 저장
-    const videoTrack = stream.value.getVideoTracks()[0];
-    const settings = videoTrack.getSettings();
-    streamInfo.value = {
-      width: settings.width,
-      height: settings.height,
-      frameRate: settings.frameRate
-    };
-    
-    console.log('카메라 스트림 획득 성공:', {
-      deviceId: settings.deviceId,
-      width: settings.width,
-      height: settings.height,
-      frameRate: settings.frameRate
-    });
-    
+    if (!stream.value) {
+      throw new Error('카메라 스트림을 가져올 수 없습니다.');
+    }
+
     // 비디오 엘리먼트에 스트림 연결
     if (videoElement.value) {
       videoElement.value.srcObject = stream.value;
-      console.log('비디오 엘리먼트에 스트림 연결됨');
+      hasPermission.value = true;
+      errorMessage.value = '';
     }
-    
-    hasPermission.value = true;
-    errorMessage.value = '';
-    connectWebSocket();
+
+    // 스트림 정보 저장
+    const videoTrack = stream.value.getVideoTracks()[0];
+    if (videoTrack) {
+      const settings = videoTrack.getSettings();
+      streamInfo.value = {
+        width: settings.width || 640,
+        height: settings.height || 480
+      };
+    }
+
   } catch (error) {
     console.error('카메라 권한 에러:', error);
-    if (error.name === 'NotReadableError') {
-      errorMessage.value = '카메라가 다른 프로그램에 의해 사용 중입니다. 다른 프로그램을 종료하고 다시 시도해주세요.';
-    } else if (error.name === 'NotAllowedError') {
-      errorMessage.value = '카메라 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.';
-    } else {
-      errorMessage.value = `카메라 오류: ${error.message}`;
-    }
     hasPermission.value = false;
+    errorMessage.value = error.name === 'NotAllowedError' 
+      ? '카메라 접근이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.'
+      : '카메라 연결 중 오류가 발생했습니다.';
   }
 };
 

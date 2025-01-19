@@ -1,311 +1,368 @@
 <template>
   <div class="robot-settings">
-    <div class="header">
+    <div class="page-header">
       <h2>로봇 설정</h2>
-      <button class="add-robot-btn" @click="showAddRobotModal = true">
-        <span>+</span> 로봇 추가
-      </button>
-    </div>
-
-    <div class="robot-list">
-      <div v-for="robot in robots" :key="robot.id" class="robot-card">
-        <div class="robot-header">
-          <div class="robot-status" :class="{ active: robot.isActive }">
-            {{ robot.isActive ? '활성' : '비활성' }}
-          </div>
-          <h3>{{ robot.name }}</h3>
-        </div>
-
-        <div class="robot-info">
-          <div class="info-item">
-            <span class="label">ID</span>
-            <span class="value">{{ robot.id }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">상태</span>
-            <span class="value">{{ robot.status }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">현재 위치</span>
-            <span class="value">{{ robot.location }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">배터리</span>
-            <span class="value">{{ robot.battery }}%</span>
-          </div>
-        </div>
-
-        <div class="robot-controls">
-          <button class="control-btn" @click="toggleRobotStatus(robot.id)">
-            {{ robot.isActive ? '비활성화' : '활성화' }}
-          </button>
-          <button class="control-btn" @click="openManualControl(robot.id)">
-            수동 제어
-          </button>
-          <button class="control-btn settings" @click="openSettings(robot.id)">
-            설정
-          </button>
-        </div>
+      <div class="header-actions">
+        <button class="action-btn" @click="saveSettings" :disabled="isSaving">
+          {{ isSaving ? '저장 중...' : '설정 저장' }}
+        </button>
       </div>
     </div>
 
-    <!-- 로봇 추가 모달 -->
-    <div v-if="showAddRobotModal" class="modal">
-      <div class="modal-content">
-        <h3>새 로봇 추가</h3>
-        <form @submit.prevent="addNewRobot">
+    <div class="settings-grid">
+      <!-- 기본 설정 -->
+      <div class="settings-card">
+        <h3>기본 설정</h3>
+        <div class="settings-content">
           <div class="form-group">
             <label>로봇 이름</label>
-            <input v-model="newRobot.name" type="text" required>
+            <input v-model="settings.name" type="text">
           </div>
           <div class="form-group">
-            <label>로봇 ID</label>
-            <input v-model="newRobot.id" type="text" required>
+            <label>IP 주소</label>
+            <input v-model="settings.ip_address" type="text">
           </div>
-          <div class="modal-buttons">
-            <button type="button" @click="showAddRobotModal = false">취소</button>
-            <button type="submit">추가</button>
+          <div class="form-group">
+            <label>설명</label>
+            <textarea v-model="settings.description" rows="3"></textarea>
           </div>
-        </form>
+        </div>
+      </div>
+
+      <!-- 동작 설정 -->
+      <div class="settings-card">
+        <h3>동작 설정</h3>
+        <div class="settings-content">
+          <div class="form-group">
+            <label>최대 이동 속도 (m/s)</label>
+            <input v-model="settings.max_speed" type="number" step="0.1" min="0">
+          </div>
+          <div class="form-group">
+            <label>최대 회전 속도 (rad/s)</label>
+            <input v-model="settings.max_angular_speed" type="number" step="0.1" min="0">
+          </div>
+          <div class="form-group">
+            <label>가속도 제한 (m/s²)</label>
+            <input v-model="settings.acceleration_limit" type="number" step="0.1" min="0">
+          </div>
+        </div>
+      </div>
+
+      <!-- 센서 설정 -->
+      <div class="settings-card">
+        <h3>센서 설정</h3>
+        <div class="settings-content">
+          <div class="form-group">
+            <label>LiDAR 스캔 주기 (Hz)</label>
+            <input v-model="settings.lidar_frequency" type="number" min="1">
+          </div>
+          <div class="form-group">
+            <label>카메라 해상도</label>
+            <select v-model="settings.camera_resolution">
+              <option value="640x480">640 x 480</option>
+              <option value="1280x720">1280 x 720</option>
+              <option value="1920x1080">1920 x 1080</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>카메라 FPS</label>
+            <select v-model="settings.camera_fps">
+              <option value="15">15 FPS</option>
+              <option value="30">30 FPS</option>
+              <option value="60">60 FPS</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 안전 설정 -->
+      <div class="settings-card">
+        <h3>안전 설정</h3>
+        <div class="settings-content">
+          <div class="form-group">
+            <label>충돌 방지 거리 (m)</label>
+            <input v-model="settings.safety_distance" type="number" step="0.1" min="0">
+          </div>
+          <div class="form-group">
+            <label>배터리 부족 경고 레벨 (%)</label>
+            <input v-model="settings.low_battery_threshold" type="number" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label>자동 충전 시작 레벨 (%)</label>
+            <input v-model="settings.auto_charging_threshold" type="number" min="0" max="100">
+          </div>
+        </div>
+      </div>
+
+      <!-- 네트워크 설정 -->
+      <div class="settings-card">
+        <h3>네트워크 설정</h3>
+        <div class="settings-content">
+          <div class="form-group">
+            <label>WebSocket 포트</label>
+            <input v-model="settings.websocket_port" type="number" min="1024" max="65535">
+          </div>
+          <div class="form-group">
+            <label>데이터 전송 주기 (ms)</label>
+            <input v-model="settings.data_publish_rate" type="number" min="10">
+          </div>
+          <div class="form-group">
+            <label>연결 재시도 간격 (ms)</label>
+            <input v-model="settings.reconnect_interval" type="number" min="1000">
+          </div>
+        </div>
+      </div>
+
+      <!-- 고급 설정 -->
+      <div class="settings-card">
+        <h3>고급 설정</h3>
+        <div class="settings-content">
+          <div class="form-group">
+            <label>디버그 모드</label>
+            <div class="toggle-switch">
+              <input 
+                type="checkbox" 
+                v-model="settings.debug_mode"
+                :id="'debug-mode'"
+              >
+              <label :for="'debug-mode'"></label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>로그 레벨</label>
+            <select v-model="settings.log_level">
+              <option value="error">Error</option>
+              <option value="warn">Warning</option>
+              <option value="info">Info</option>
+              <option value="debug">Debug</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>자동 업데이트</label>
+            <div class="toggle-switch">
+              <input 
+                type="checkbox" 
+                v-model="settings.auto_update"
+                :id="'auto-update'"
+              >
+              <label :for="'auto-update'"></label>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { webSocketService } from '@/services/websocket'
 
-const showAddRobotModal = ref(false)
-const robots = ref([
-  {
-    id: 'SSAFY-ROBO-1',
-    name: 'Robot 1',
-    isActive: true,
-    status: '순찰 중',
-    location: '1층 사무실',
-    battery: 85
-  },
-  {
-    id: 'SSAFY-ROBO-2',
-    name: 'Robot 2',
-    isActive: false,
-    status: '대기 중',
-    location: '충전소',
-    battery: 30
-  }
-])
+const route = useRoute()
+const isSaving = ref(false)
 
-const newRobot = ref({
+// 설정 상태 관리
+const settings = ref({
   name: '',
-  id: ''
+  ip_address: '',
+  description: '',
+  max_speed: 1.0,
+  max_angular_speed: 1.0,
+  acceleration_limit: 0.5,
+  lidar_frequency: 10,
+  camera_resolution: '640x480',
+  camera_fps: '30',
+  safety_distance: 0.5,
+  low_battery_threshold: 20,
+  auto_charging_threshold: 30,
+  websocket_port: 8000,
+  data_publish_rate: 100,
+  reconnect_interval: 3000,
+  debug_mode: false,
+  log_level: 'info',
+  auto_update: true
 })
 
-const toggleRobotStatus = (robotId) => {
-  const robot = robots.value.find(r => r.id === robotId)
-  if (robot) {
-    robot.isActive = !robot.isActive
+// 설정 로드
+const loadSettings = async () => {
+  try {
+    const response = await fetch(`/api/robots/${route.params.robotId}/settings`)
+    if (!response.ok) throw new Error('설정을 불러올 수 없습니다.')
+    const data = await response.json()
+    settings.value = { ...settings.value, ...data }
+  } catch (error) {
+    console.error('설정 로드 실패:', error)
   }
 }
 
-const openManualControl = (robotId) => {
-  // 수동 제어 페이지로 이동 또는 모달 표시
-  console.log('수동 제어:', robotId)
+// 설정 저장
+const saveSettings = async () => {
+  try {
+    isSaving.value = true
+    const response = await fetch(`/api/robots/${route.params.robotId}/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(settings.value)
+    })
+
+    if (!response.ok) throw new Error('설정을 저장할 수 없습니다.')
+
+    // 설정 변경 알림
+    webSocketService.send('robot_settings_update', {
+      robotId: route.params.robotId,
+      settings: settings.value
+    })
+
+    alert('설정이 저장되었습니다.')
+  } catch (error) {
+    console.error('설정 저장 실패:', error)
+    alert(error.message)
+  } finally {
+    isSaving.value = false
+  }
 }
 
-const openSettings = (robotId) => {
-  // 설정 페이지로 이동 또는 모달 표시
-  console.log('설정:', robotId)
-}
-
-const addNewRobot = () => {
-  robots.value.push({
-    ...newRobot.value,
-    isActive: false,
-    status: '대기 중',
-    location: '미지정',
-    battery: 100
-  })
-  showAddRobotModal.value = false
-  newRobot.value = { name: '', id: '' }
-}
+onMounted(() => {
+  loadSettings()
+})
 </script>
 
 <style scoped>
 .robot-settings {
-  padding: 1.5rem;
+  padding: 20px;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 20px;
 }
 
-.add-robot-btn {
-  background-color: #007bff;
-  color: white;
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  padding: 8px 16px;
   border: none;
-  padding: 0.5rem 1rem;
   border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.robot-list {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.robot-card {
-  background-color: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.robot-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.robot-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.875rem;
-  background-color: #dc3545;
+  background: #2196F3;
   color: white;
-}
-
-.robot-status.active {
-  background-color: #28a745;
-}
-
-.robot-info {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.label {
-  color: #666;
-  font-size: 0.875rem;
-}
-
-.value {
-  font-weight: 500;
-}
-
-.robot-controls {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.control-btn {
-  flex: 1;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: white;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.control-btn:hover {
-  background-color: #f8f9fa;
+.action-btn:hover:not(:disabled) {
+  background: #1976D2;
 }
 
-.control-btn.settings {
-  background-color: #6c757d;
-  color: white;
-  border: none;
+.action-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
 }
 
-.modal-content {
-  background-color: white;
-  padding: 2rem;
+.settings-card {
+  background: white;
   border-radius: 8px;
-  width: 100%;
-  max-width: 500px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.settings-card h3 {
+  margin: 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #eee;
+}
+
+.settings-content {
+  padding: 15px;
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 15px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 5px;
   color: #333;
+  font-weight: 500;
 }
 
-.form-group input {
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
   width: 100%;
-  padding: 0.5rem;
+  padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 1em;
 }
 
-.modal-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #2196F3;
+  outline: none;
 }
 
-.modal-buttons button {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch label {
+  position: absolute;
   cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
 }
 
-.modal-buttons button[type="button"] {
-  background-color: #6c757d;
-  color: white;
-  border: none;
+.toggle-switch label:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
 }
 
-.modal-buttons button[type="submit"] {
-  background-color: #007bff;
-  color: white;
-  border: none;
+.toggle-switch input:checked + label {
+  background-color: #2196F3;
 }
 
-@media (max-width: 768px) {
-  .robot-info {
-    grid-template-columns: 1fr;
-  }
-  
-  .robot-controls {
-    flex-direction: column;
-  }
-  
-  .control-btn {
-    width: 100%;
-  }
+.toggle-switch input:checked + label:before {
+  transform: translateX(26px);
 }
 </style> 

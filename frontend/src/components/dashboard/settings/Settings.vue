@@ -1,182 +1,161 @@
 <template>
-  <div class="settings">
-    <h2>설정</h2>
-
-    <!-- 일반 설정 -->
-    <section class="settings-section">
-      <h3>일반 설정</h3>
-      
-      <div class="setting-group">
-        <div class="setting-item">
-          <label>시스템 언어</label>
-          <select v-model="settings.language" class="setting-input">
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-          </select>
-        </div>
-
-        <div class="setting-item">
-          <label>시간대</label>
-          <select v-model="settings.timezone" class="setting-input">
-            <option value="Asia/Seoul">서울 (UTC+9)</option>
-            <option value="UTC">UTC</option>
-          </select>
-        </div>
-
-        <div class="setting-item">
-          <label>날짜 형식</label>
-          <select v-model="settings.dateFormat" class="setting-input">
-            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-          </select>
-        </div>
+  <div class="settings-container">
+    <div class="page-header">
+      <h2>설정</h2>
+      <div class="header-actions">
+        <button @click="saveSettings" class="save-button" :disabled="saving">
+          <i class="fas fa-save"></i> 저장
+        </button>
       </div>
-    </section>
+    </div>
 
-    <!-- 알림 설정 -->
-    <section class="settings-section">
-      <h3>알림 설정</h3>
-      
-      <div class="setting-group">
-        <div class="setting-item">
-          <label>알림 사용</label>
-          <div class="toggle-switch">
-            <input type="checkbox" 
-                   v-model="settings.notifications.enabled"
-                   id="notifications-toggle">
-            <label for="notifications-toggle"></label>
+    <div class="settings-grid">
+      <!-- 일반 설정 -->
+      <div class="settings-card">
+        <h3>일반 설정</h3>
+        <div class="settings-form">
+          <div class="form-group">
+            <label>언어</label>
+            <select v-model="settings.general.language">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select>
           </div>
-        </div>
-
-        <div class="setting-item" v-if="settings.notifications.enabled">
-          <label>알림 유형</label>
-          <div class="checkbox-group">
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.types.security">
-              보안 알림
-            </label>
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.types.system">
-              시스템 알림
-            </label>
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.types.task">
-              작업 알림
-            </label>
+          <div class="form-group">
+            <label>테마</label>
+            <select v-model="settings.general.theme">
+              <option value="light">라이트</option>
+              <option value="dark">다크</option>
+              <option value="system">시스템</option>
+            </select>
           </div>
-        </div>
-
-        <div class="setting-item" v-if="settings.notifications.enabled">
-          <label>알림 방법</label>
-          <div class="checkbox-group">
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.methods.email">
-              이메일
-            </label>
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.methods.sms">
-              SMS
-            </label>
-            <label class="checkbox-item">
-              <input type="checkbox" 
-                     v-model="settings.notifications.methods.push">
-              푸시 알림
-            </label>
+          <div class="form-group">
+            <label>시간대</label>
+            <select v-model="settings.general.timezone">
+              <option value="Asia/Seoul">서울 (UTC+9)</option>
+              <option value="UTC">UTC</option>
+            </select>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- 로봇 설정 -->
-    <section class="settings-section">
-      <h3>로봇 설정</h3>
-      
-      <div class="setting-group">
-        <div class="setting-item">
-          <label>자동 충전 임계값</label>
-          <div class="range-input">
-            <input type="range" 
-                   v-model="settings.robot.autoChargeThreshold"
-                   min="10" 
-                   max="50"
-                   step="5">
-            <span class="range-value">{{ settings.robot.autoChargeThreshold }}%</span>
+      <!-- 알림 설정 -->
+      <div class="settings-card">
+        <h3>알림 설정</h3>
+        <div class="settings-form">
+          <div class="form-group">
+            <label>알림 사용</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.notifications.enabled"
+                :id="'notifications-enabled'"
+              />
+              <label :for="'notifications-enabled'"></label>
+            </div>
           </div>
-        </div>
-
-        <div class="setting-item">
-          <label>순찰 속도</label>
-          <div class="range-input">
-            <input type="range" 
-                   v-model="settings.robot.patrolSpeed"
-                   min="1" 
-                   max="5"
-                   step="1">
-            <span class="range-value">레벨 {{ settings.robot.patrolSpeed }}</span>
+          <div class="form-group" v-if="settings.notifications.enabled">
+            <label>이메일 알림</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.notifications.email"
+                :id="'notifications-email'"
+              />
+              <label :for="'notifications-email'"></label>
+            </div>
           </div>
-        </div>
-
-        <div class="setting-item">
-          <label>야간 모드</label>
-          <div class="toggle-switch">
-            <input type="checkbox" 
-                   v-model="settings.robot.nightMode"
-                   id="night-mode-toggle">
-            <label for="night-mode-toggle"></label>
+          <div class="form-group" v-if="settings.notifications.enabled">
+            <label>푸시 알림</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.notifications.push"
+                :id="'notifications-push'"
+              />
+              <label :for="'notifications-push'"></label>
+            </div>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- 백업 설정 -->
-    <section class="settings-section">
-      <h3>백업 설정</h3>
-      
-      <div class="setting-group">
-        <div class="setting-item">
-          <label>자동 백업</label>
-          <div class="toggle-switch">
-            <input type="checkbox" 
-                   v-model="settings.backup.enabled"
-                   id="backup-toggle">
-            <label for="backup-toggle"></label>
+      <!-- 데이터 설정 -->
+      <div class="settings-card">
+        <h3>데이터 설정</h3>
+        <div class="settings-form">
+          <div class="form-group">
+            <label>데이터 저장 기간</label>
+            <select v-model="settings.data.retentionPeriod">
+              <option value="30">30일</option>
+              <option value="60">60일</option>
+              <option value="90">90일</option>
+              <option value="180">180일</option>
+              <option value="365">1년</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>자동 백업</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.data.autoBackup"
+                :id="'data-autobackup'"
+              />
+              <label :for="'data-autobackup'"></label>
+            </div>
+          </div>
+          <div class="form-group" v-if="settings.data.autoBackup">
+            <label>백업 주기</label>
+            <select v-model="settings.data.backupInterval">
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
           </div>
         </div>
+      </div>
 
-        <div class="setting-item" v-if="settings.backup.enabled">
-          <label>백업 주기</label>
-          <select v-model="settings.backup.interval" class="setting-input">
-            <option value="daily">매일</option>
-            <option value="weekly">매주</option>
-            <option value="monthly">매월</option>
-          </select>
-        </div>
-
-        <div class="setting-item" v-if="settings.backup.enabled">
-          <label>보관 기간</label>
-          <select v-model="settings.backup.retention" class="setting-input">
-            <option value="30">30일</option>
-            <option value="60">60일</option>
-            <option value="90">90일</option>
-          </select>
+      <!-- 보안 설정 -->
+      <div class="settings-card">
+        <h3>보안 설정</h3>
+        <div class="settings-form">
+          <div class="form-group">
+            <label>2단계 인증</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.security.twoFactor"
+                :id="'security-twofactor'"
+              />
+              <label :for="'security-twofactor'"></label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>세션 타임아웃</label>
+            <select v-model="settings.security.sessionTimeout">
+              <option value="15">15분</option>
+              <option value="30">30분</option>
+              <option value="60">1시간</option>
+              <option value="120">2시간</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>IP 접근 제한</label>
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="settings.security.ipRestriction"
+                :id="'security-iprestriction'"
+              />
+              <label :for="'security-iprestriction'"></label>
+            </div>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- 저장 버튼 -->
-    <div class="settings-actions">
-      <button class="action-btn save" @click="saveSettings">
-        설정 저장
-      </button>
-      <button class="action-btn reset" @click="resetSettings">
-        초기화
-      </button>
+    <div v-if="saving" class="loading-overlay">
+      <div class="loading-spinner"></div>
     </div>
   </div>
 </template>
@@ -184,103 +163,130 @@
 <script setup>
 import { ref } from 'vue'
 
+const saving = ref(false)
+
 // 설정 상태
 const settings = ref({
-  language: 'ko',
-  timezone: 'Asia/Seoul',
-  dateFormat: 'YYYY-MM-DD',
+  general: {
+    language: 'ko',
+    theme: 'light',
+    timezone: 'Asia/Seoul'
+  },
   notifications: {
     enabled: true,
-    types: {
-      security: true,
-      system: true,
-      task: true
-    },
-    methods: {
-      email: true,
-      sms: false,
-      push: true
-    }
+    email: true,
+    push: true
   },
-  robot: {
-    autoChargeThreshold: 20,
-    patrolSpeed: 3,
-    nightMode: false
+  data: {
+    retentionPeriod: '90',
+    autoBackup: true,
+    backupInterval: 'daily'
   },
-  backup: {
-    enabled: true,
-    interval: 'daily',
-    retention: '30'
+  security: {
+    twoFactor: false,
+    sessionTimeout: '30',
+    ipRestriction: false
   }
 })
 
-// 초기 설정 저장
-const initialSettings = JSON.parse(JSON.stringify(settings.value))
-
 // 설정 저장
 const saveSettings = async () => {
+  saving.value = true
   try {
-    // API 호출 및 설정 저장 로직
-    // await fetch('/api/settings', {
-    //   method: 'POST',
-    //   body: JSON.stringify(settings.value)
-    // })
-    alert('설정이 저장되었습니다.')
+    // 실제 API 호출로 대체 필요
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    console.log('설정 저장:', settings.value)
   } catch (error) {
-    console.error('설정 저장 실패:', error)
-    alert('설정 저장에 실패했습니다.')
-  }
-}
-
-// 설정 초기화
-const resetSettings = () => {
-  if (confirm('설정을 초기화하시겠습니까?')) {
-    settings.value = JSON.parse(JSON.stringify(initialSettings))
+    console.error('설정 저장 중 오류:', error)
+  } finally {
+    saving.value = false
   }
 }
 </script>
 
 <style scoped>
-.settings {
-  padding: 1.5rem;
-}
-
-.settings-section {
-  background-color: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.settings-section h3 {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #f0f0f0;
-}
-
-.setting-group {
+.settings-container {
+  padding: 20px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 20px;
 }
 
-.setting-item {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.setting-item label {
-  font-weight: 500;
-  color: #333;
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.setting-input {
-  padding: 0.5rem;
+.save-button {
+  padding: 8px 16px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-button:hover {
+  background: #388E3C;
+}
+
+.save-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.settings-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.settings-card h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-group label {
+  color: #666;
+  font-size: 14px;
+}
+
+.form-group select {
+  padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  min-width: 200px;
+  min-width: 150px;
 }
 
 /* 토글 스위치 스타일 */
@@ -304,8 +310,8 @@ const resetSettings = () => {
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: 0.4s;
-  border-radius: 24px;
+  transition: .4s;
+  border-radius: 34px;
 }
 
 .toggle-switch label:before {
@@ -316,92 +322,41 @@ const resetSettings = () => {
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: 0.4s;
+  transition: .4s;
   border-radius: 50%;
 }
 
 .toggle-switch input:checked + label {
-  background-color: #007bff;
+  background-color: #2196F3;
 }
 
 .toggle-switch input:checked + label:before {
   transform: translateX(26px);
 }
 
-/* 체크박스 그룹 스타일 */
-.checkbox-group {
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.checkbox-item {
-  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
 }
 
-/* 범위 입력 스타일 */
-.range-input {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  min-width: 200px;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-.range-input input[type="range"] {
-  flex: 1;
-}
-
-.range-value {
-  min-width: 4rem;
-  text-align: right;
-}
-
-/* 저장 버튼 스타일 */
-.settings-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.action-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.action-btn.save {
-  background-color: #007bff;
-  color: white;
-}
-
-.action-btn.reset {
-  background-color: #6c757d;
-  color: white;
-}
-
-@media (max-width: 768px) {
-  .setting-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .setting-input,
-  .range-input {
-    width: 100%;
-  }
-  
-  .settings-actions {
-    flex-direction: column;
-  }
-  
-  .action-btn {
-    width: 100%;
-  }
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style> 

@@ -19,7 +19,9 @@
     "vue-chart-3": "^3.1.8",
     "vue-echarts": "^6.6.8",
     "vue-router": "^4.2.5",
-    "websocket": "^1.0.34"
+    "vuedraggable": "^4.1.0",
+    "websocket": "^1.0.34",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.2",

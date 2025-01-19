@@ -9,92 +9,118 @@
       </div>
     </div>
 
-    <!-- 로봇 상태 목록 -->
-    <div class="robot-status-list">
-      <div v-for="robot in robots" 
-           :key="robot.id" 
-           class="robot-status-card"
-           :class="{ 'status-warning': robot.batteryLevel < 30, 
-                    'status-danger': robot.batteryLevel < 15 }">
-        <div class="robot-header">
-          <span class="robot-name">{{ robot.name }}</span>
-          <span class="status-badge" :class="robot.status">
-            {{ getStatusLabel(robot.status) }}
-          </span>
-        </div>
-
-        <div class="status-details">
-          <div class="status-item">
-            <span class="label">배터리</span>
-            <div class="battery-indicator">
-              <div class="battery-level" 
-                   :style="{ width: robot.batteryLevel + '%',
-                           backgroundColor: getBatteryColor(robot.batteryLevel) }">
+    <draggable 
+      v-model="monitoringComponents" 
+      class="monitoring-sections"
+      handle=".section-handle"
+      item-key="id"
+      @start="drag=true" 
+      @end="drag=false"
+    >
+      <template #item="{element}">
+        <div class="monitoring-section">
+          <div class="section-header">
+            <div class="section-handle">⋮⋮</div>
+            <h4>{{ element.title }}</h4>
+          </div>
+          
+          <!-- 로봇 상태 목록 -->
+          <div v-if="element.type === 'robots'" class="robot-status-list">
+            <div v-for="robot in robots" 
+                :key="robot.id" 
+                class="robot-status-card"
+                :class="{ 'status-warning': robot.batteryLevel < 30, 
+                          'status-danger': robot.batteryLevel < 15 }">
+              <div class="robot-header">
+                <span class="robot-name">{{ robot.name }}</span>
+                <span class="status-badge" :class="robot.status">
+                  {{ getStatusLabel(robot.status) }}
+                </span>
               </div>
-              <span class="battery-text">{{ robot.batteryLevel }}%</span>
+
+              <div class="status-details">
+                <div class="status-item">
+                  <span class="label">배터리</span>
+                  <div class="battery-indicator">
+                    <div class="battery-level" 
+                        :style="{ width: robot.batteryLevel + '%',
+                                backgroundColor: getBatteryColor(robot.batteryLevel) }">
+                    </div>
+                    <span class="battery-text">{{ robot.batteryLevel }}%</span>
+                  </div>
+                </div>
+
+                <div class="status-item">
+                  <span class="label">현재 위치</span>
+                  <span class="value">{{ robot.location }}</span>
+                </div>
+
+                <div class="status-item">
+                  <span class="label">현재 작업</span>
+                  <span class="value">{{ robot.currentTask || '대기 중' }}</span>
+                </div>
+
+                <div class="status-item">
+                  <span class="label">센서 상태</span>
+                  <div class="sensor-status">
+                    <span v-for="(status, sensor) in robot.sensors" 
+                          :key="sensor"
+                          class="sensor-badge"
+                          :class="status">
+                      {{ getSensorLabel(sensor) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="quick-actions">
+                <button class="action-btn" 
+                        @click="sendToCharge(robot)"
+                        :disabled="robot.status === 'charging'">
+                  충전소로 이동
+                </button>
+                <button class="action-btn" 
+                        @click="emergencyStop(robot)"
+                        :disabled="robot.status === 'stopped'">
+                  긴급 정지
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="status-item">
-            <span class="label">현재 위치</span>
-            <span class="value">{{ robot.location }}</span>
-          </div>
-
-          <div class="status-item">
-            <span class="label">현재 작업</span>
-            <span class="value">{{ robot.currentTask || '대기 중' }}</span>
-          </div>
-
-          <div class="status-item">
-            <span class="label">센서 상태</span>
-            <div class="sensor-status">
-              <span v-for="(status, sensor) in robot.sensors" 
-                    :key="sensor"
-                    class="sensor-badge"
-                    :class="status">
-                {{ getSensorLabel(sensor) }}
-              </span>
+          <!-- 알림 목록 -->
+          <div v-if="element.type === 'alerts'" class="alert-section">
+            <div class="alert-list">
+              <div v-for="alert in recentAlerts" 
+                  :key="alert.id"
+                  class="alert-item"
+                  :class="alert.type">
+                <span class="alert-time">{{ formatTime(alert.timestamp) }}</span>
+                <p class="alert-message">{{ alert.message }}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="quick-actions">
-          <button class="action-btn" 
-                  @click="sendToCharge(robot)"
-                  :disabled="robot.status === 'charging'">
-            충전소로 이동
-          </button>
-          <button class="action-btn" 
-                  @click="emergencyStop(robot)"
-                  :disabled="robot.status === 'stopped'">
-            긴급 정지
-          </button>
+          <!-- 로봇 지도 -->
+          <MapView v-if="element.type === 'map'" class="robot-map-section" />
         </div>
-      </div>
-    </div>
-
-    <!-- 알림 목록 -->
-    <div class="alert-section">
-      <h4>실시간 알림</h4>
-      <div class="alert-list">
-        <div v-for="alert in recentAlerts" 
-             :key="alert.id"
-             class="alert-item"
-             :class="alert.type">
-          <span class="alert-time">{{ formatTime(alert.timestamp) }}</span>
-          <p class="alert-message">{{ alert.message }}</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 로봇 지도 -->
-    <RobotMap class="robot-map-section" />
+      </template>
+    </draggable>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import RobotMap from './RobotMap.vue'
+import MapView from './MapView.vue'
+import draggable from 'vuedraggable'
+import { webSocketService } from '@/services/websocket'
+
+// 모니터링 컴포넌트 순서 관리
+const monitoringComponents = ref([
+  { id: 1, type: 'robots', title: '로봇 목록' },
+  { id: 2, type: 'alerts', title: '실시간 알림' },
+  { id: 3, type: 'map', title: '로봇 지도' }
+])
 
 // 로봇 상태 데이터
 const robots = ref([
@@ -199,49 +225,29 @@ const emergencyStop = (robot) => {
 }
 
 // WebSocket 연결 설정
-let ws = null
-
-const connectWebSocket = () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    console.log('WebSocket이 이미 연결되어 있습니다.');
-    return;
-  }
-
+const setupWebSocket = async () => {
   try {
-    ws = new WebSocket('ws://localhost:8080/ws/monitoring/ROBOT_001');
+    await webSocketService.connect('ws://localhost:8000/ws')
     
-    ws.onopen = () => {
-      console.log('모니터링 WebSocket 연결 성공');
-      reconnectAttempts = 0;
-    };
+    // 로봇 상태 구독
+    webSocketService.subscribe('monitoring/robots', (data) => {
+      console.log('로봇 상태 업데이트:', data)
+      updateRobotStatus(data)
+    })
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket 메시지 수신:', data);  // 디버깅을 위한 로그 추가
-        updateRobotStatus(data);
-      } catch (error) {
-        console.error('WebSocket 메시지 처리 중 에러:', error);
-      }
-    };
+    // 알림 구독
+    webSocketService.subscribe('monitoring/alerts', (data) => {
+      addAlert(data)
+    })
 
-    ws.onerror = (error) => {
-      console.error(`모니터링 WebSocket 에러 - Robot ${robotId}:`, error);
-    };
-
-    ws.onclose = () => {
-      console.log(`모니터링 WebSocket 연결 끊김 - Robot ${robotId}`);
-      // 재연결 시도
-      setTimeout(connectWebSocket, 3000);
-    };
   } catch (error) {
-    console.error('WebSocket 연결 중 에러:', error);
+    console.error('WebSocket 연결 실패:', error)
   }
-};
+}
 
 // 로봇 상태 업데이트
 const updateRobotStatus = (data) => {
-  console.log('받은 데이터:', data);  // 디버깅을 위한 로그 추가
+  console.log('받은 데이터:', data)
   
   // 백엔드 데이터 형식에 맞게 매핑
   const robotData = {
@@ -251,27 +257,27 @@ const updateRobotStatus = (data) => {
     location: `${Math.round(data.location.x)}, ${Math.round(data.location.y)}`,
     currentTask: data.current_task || '대기 중',
     lastUpdated: data.last_updated
-  };
+  }
 
-  const robotIndex = robots.value.findIndex(r => r.id === robotData.id);
+  const robotIndex = robots.value.findIndex(r => r.id === robotData.id)
   if (robotIndex !== -1) {
     // 기존 데이터와 새로운 데이터 병합
     robots.value[robotIndex] = {
       ...robots.value[robotIndex],
       ...robotData
-    };
+    }
 
     // 배터리 부족 알림 추가
     if (robotData.batteryLevel < 30) {
       addAlert({
         type: 'warning',
         message: `${robots.value[robotIndex].name}의 배터리가 부족합니다. (${robotData.batteryLevel}%)`
-      });
+      })
     }
   } else {
-    console.log('로봇을 찾을 수 없음:', robotData.id);
+    console.log('로봇을 찾을 수 없음:', robotData.id)
   }
-};
+}
 
 // 알림 추가
 const addAlert = (alert) => {
@@ -289,68 +295,71 @@ const addAlert = (alert) => {
 
 // 컴포넌트 마운트/언마운트 시 WebSocket 연결/해제
 onMounted(() => {
-  connectWebSocket()
+  setupWebSocket()
 })
 
 onUnmounted(() => {
-  if (ws) {
-    ws.close()
+  if (webSocketService.isConnected()) {
+    webSocketService.disconnect()
   }
 })
 </script>
 
 <style scoped>
 .realtime-monitoring {
-  padding: 1rem;
   height: 100%;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  padding: 20px;
 }
 
-.monitoring-header {
+.monitoring-sections {
+  flex: 1;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.monitoring-section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  display: flex;
   align-items: center;
-  margin-bottom: 1rem;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
 }
 
-.refresh-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.25rem;
+.section-handle {
+  cursor: move;
+  padding: 0 10px;
   color: #666;
+  font-size: 18px;
 }
 
-.refresh-icon {
-  display: inline-block;
-  transition: transform 0.3s ease;
-}
-
-.refresh-btn:hover .refresh-icon {
-  transform: rotate(180deg);
+.section-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
 }
 
 .robot-status-list {
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
 }
 
 .robot-status-card {
-  background-color: white;
+  background: white;
   border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.robot-status-card.status-warning {
-  border-left: 4px solid #ffc107;
-}
-
-.robot-status-card.status-danger {
-  border-left: 4px solid #dc3545;
+  padding: 20px;
+  border: 1px solid #eee;
 }
 
 .robot-header {
@@ -392,7 +401,10 @@ onUnmounted(() => {
 }
 
 .status-details {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 15px 0;
 }
 
 .status-item {
@@ -407,131 +419,115 @@ onUnmounted(() => {
 }
 
 .battery-indicator {
-  height: 4px;
-  background-color: #e9ecef;
-  border-radius: 2px;
+  width: 100%;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
   position: relative;
-  margin-top: 0.25rem;
 }
 
 .battery-level {
   height: 100%;
-  border-radius: 2px;
   transition: width 0.3s ease;
 }
 
 .battery-text {
   position: absolute;
-  right: 0;
-  top: -1.25rem;
-  font-size: 0.875rem;
-  color: #666;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 12px;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
 }
 
 .sensor-status {
   display: flex;
+  gap: 10px;
   flex-wrap: wrap;
-  gap: 0.5rem;
 }
 
 .sensor-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .sensor-badge.normal {
-  background-color: #28a745;
+  background: #28a745;
   color: white;
 }
 
 .sensor-badge.warning {
-  background-color: #ffc107;
+  background: #ffc107;
   color: #000;
 }
 
 .sensor-badge.error {
-  background-color: #dc3545;
+  background: #dc3545;
   color: white;
 }
 
 .quick-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 10px;
+  margin-top: 15px;
 }
 
 .action-btn {
   flex: 1;
-  padding: 0.5rem;
+  padding: 8px;
   border: none;
   border-radius: 4px;
-  background-color: #007bff;
+  background: #007bff;
   color: white;
   cursor: pointer;
-  font-size: 0.875rem;
+  transition: background-color 0.3s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: #0056b3;
 }
 
 .action-btn:disabled {
-  background-color: #ccc;
+  background: #ccc;
   cursor: not-allowed;
 }
 
 .alert-section {
-  border-top: 1px solid #ddd;
-  padding-top: 1rem;
-}
-
-.alert-section h4 {
-  margin-bottom: 1rem;
+  padding: 20px;
 }
 
 .alert-list {
-  max-height: 200px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .alert-item {
-  padding: 0.5rem;
+  padding: 12px;
   border-radius: 4px;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .alert-item.warning {
-  background-color: #fff3cd;
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
   color: #856404;
 }
 
 .alert-item.info {
-  background-color: #cce5ff;
+  background: #cce5ff;
+  border: 1px solid #b8daff;
   color: #004085;
 }
 
-.alert-time {
-  display: block;
-  font-size: 0.75rem;
-  color: #666;
-  margin-bottom: 0.25rem;
-}
-
-.alert-message {
-  margin: 0;
-}
-
-@media (max-width: 768px) {
-  .quick-actions {
-    flex-direction: column;
-  }
-  
-  .action-btn {
-    width: 100%;
-  }
-}
-
 .robot-map-section {
-  margin: 1rem 0;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
+  height: 400px;
+  padding: 20px;
 }
 </style>
 
