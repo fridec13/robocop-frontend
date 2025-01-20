@@ -1,6 +1,6 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import json
 import asyncio
 import random
@@ -11,6 +11,24 @@ import numpy as np
 import cv2
 import base64
 import time
+import motor.motor_asyncio
+import bcrypt
+from bson import ObjectId
+from jose import JWTError, jwt
+
+# MongoDB 연결 설정
+MONGO_URL = "mongodb://localhost:27017/?directConnection=true"
+client = motor.motor_asyncio.AsyncIOMotorClient(
+    MONGO_URL,
+    serverSelectionTimeoutMS=5000,  # 서버 선택 타임아웃
+    connectTimeoutMS=10000,         # 연결 타임아웃
+)
+db = client.robocop_db
+
+# JWT 설정
+SECRET_KEY = "your-secret-key"  # 실제 운영환경에서는 안전한 키로 변경
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # API 모델 정의
 class User(BaseModel):
@@ -19,11 +37,35 @@ class User(BaseModel):
     is_active: bool = True
     is_admin: bool = False
 
+class UserInDB(User):
+    hashed_password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
 class Robot(BaseModel):
     id: str
     name: str
     status: str
     battery_level: int
+
+class CameraLog(BaseModel):
+    robot_id: str
+    timestamp: datetime
+    frame_number: int
+    image_path: Optional[str]
+    status: str
+
+class WebSocketLog(BaseModel):
+    connection_type: str
+    robot_id: str
+    timestamp: datetime
+    event_type: str
+    data: dict
 
 # 더미 데이터 저장소
 class DataStore:
@@ -112,16 +154,70 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# 로그인 엔드포인트
-@app.post("/token")
-async def login(username: str, password: str):
-    user = db.users.get(username)
-    if not user or user["password"] != password:  # 실제로는 비밀번호 해시 비교를 해야 함
+# 사용자 인증 함수
+async def get_user(username: str):
+    user_dict = await db.users.find_one({"username": username})
+    if user_dict:
+        return UserInDB(**user_dict)
+
+async def authenticate_user(username: str, password: str):
+    user = await get_user(username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+def verify_password(plain_password: str, hashed_password: str):
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+# OAuth2 의존성
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = await get_user(username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+# 로그인 엔드포인트 수정
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticate_user(form_data.username, form_data.password)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    return {"access_token": f"dummy_token_{username}", "token_type": "bearer"}
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 # 관리자용 사용자 생성 엔드포인트
 @app.post("/admin/users")
@@ -295,11 +391,12 @@ class CameraManager:
 
 camera_manager = CameraManager()
 
-# WebSocket 엔드포인트 - 카메라 스트림
+# WebSocket 엔드포인트 수정 - 카메라 스트림
 @app.websocket("/ws/camera/{robot_id}")
 async def websocket_camera(websocket: WebSocket, robot_id: str):
     try:
         await manager.connect(websocket, "camera", robot_id)
+        await log_websocket_event("camera", robot_id, "connected", {})
         print(f"카메라 WebSocket 연결됨 - Robot {robot_id}")
         
         cap = await camera_manager.get_camera(robot_id)
@@ -313,21 +410,17 @@ async def websocket_camera(websocket: WebSocket, robot_id: str):
                 if not ret:
                     error_count += 1
                     print(f"프레임 읽기 실패 ({error_count}/{max_errors}) - Robot {robot_id}")
+                    await log_websocket_event("camera", robot_id, "frame_error", 
+                        {"error_count": error_count, "max_errors": max_errors})
                     if error_count >= max_errors:
                         await websocket.send_json({"error": "카메라에서 프레임을 읽을 수 없습니다"})
                         break
                     await asyncio.sleep(1)
                     continue
 
-                error_count = 0  # 성공하면 에러 카운트 리셋
-                
-                # 프레임 크기 조정 (네트워크 부하 감소)
+                error_count = 0
                 frame = cv2.resize(frame, (640, 480))
-                
-                # JPEG으로 인코딩
                 _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                
-                # Base64로 인코딩
                 base64_image = base64.b64encode(buffer).decode('utf-8')
                 
                 camera_data = {
@@ -339,13 +432,15 @@ async def websocket_camera(websocket: WebSocket, robot_id: str):
                 }
                 
                 await websocket.send_json(camera_data)
+                await log_camera_frame(robot_id, frame_number, None, "streaming")
                 frame_number += 1
                 
-                # 프레임 레이트 조절
-                await asyncio.sleep(0.033)  # 약 30fps
+                await asyncio.sleep(0.033)
                 
             except Exception as e:
                 print(f"프레임 처리 중 에러 - Robot {robot_id}: {str(e)}")
+                await log_websocket_event("camera", robot_id, "frame_processing_error", 
+                    {"error": str(e)})
                 error_count += 1
                 if error_count >= max_errors:
                     await websocket.send_json({"error": str(e)})
@@ -354,10 +449,12 @@ async def websocket_camera(websocket: WebSocket, robot_id: str):
             
     except WebSocketDisconnect:
         print(f"카메라 WebSocket 연결 종료 - Robot {robot_id}")
+        await log_websocket_event("camera", robot_id, "disconnected", {})
         camera_manager.release_camera(robot_id)
         manager.disconnect(websocket, "camera", robot_id)
     except Exception as e:
         print(f"카메라 WebSocket 에러 - Robot {robot_id}: {str(e)}")
+        await log_websocket_event("camera", robot_id, "error", {"error": str(e)})
         camera_manager.release_camera(robot_id)
         manager.disconnect(websocket, "camera", robot_id)
         try:
@@ -521,7 +618,45 @@ async def camera_stream(websocket: WebSocket, camera_id: str):
         except:
             pass
 
+# 로그 저장 함수
+async def log_camera_frame(robot_id: str, frame_number: int, image_path: Optional[str], status: str):
+    camera_log = {
+        "robot_id": robot_id,
+        "timestamp": datetime.utcnow(),
+        "frame_number": frame_number,
+        "image_path": image_path,
+        "status": status
+    }
+    await db.camera_logs.insert_one(camera_log)
+
+async def log_websocket_event(connection_type: str, robot_id: str, event_type: str, data: dict):
+    websocket_log = {
+        "connection_type": connection_type,
+        "robot_id": robot_id,
+        "timestamp": datetime.utcnow(),
+        "event_type": event_type,
+        "data": data
+    }
+    await db.websocket_logs.insert_one(websocket_log)
+
+# 데이터베이스 연결 테스트
+async def test_db_connection():
+    try:
+        await client.admin.command('ping')
+        print("MongoDB 연결 성공!")
+        return True
+    except Exception as e:
+        print(f"MongoDB 연결 실패: {str(e)}")
+        return False
+
 # 서버 시작
 if __name__ == "__main__":
     import uvicorn
+    
+    # 데이터베이스 연결 테스트
+    loop = asyncio.get_event_loop()
+    if not loop.run_until_complete(test_db_connection()):
+        print("MongoDB 연결에 실패했습니다. 서버를 종료합니다.")
+        exit(1)
+    
     uvicorn.run(app, host="0.0.0.0", port=8080) 
