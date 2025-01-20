@@ -8,6 +8,13 @@
     </div>
 
     <!-- 로봇 목록 -->
+    <div v-if="loading" class="loading">
+      로봇 목록을 불러오는 중입니다...
+    </div>
+    <div v-else-if="robots.length === 0" class="empty-state">
+      등록된 로봇이 없습니다. <br />
+      상단의 "로봇 등록" 버튼을 클릭해 새 로봇을 등록하세요.
+    </div>
     <div class="robot-grid">
       <div v-for="robot in robots" :key="robot.id" class="robot-card">
         <div class="robot-header">
@@ -33,7 +40,7 @@
           </div>
         </div>
         <div class="robot-actions">
-          <button class="action-btn return" @click="returnRobot(robot.id)" :disabled="robot.status === 'charging'">
+          <button class="action-btn return" @click="returnRobot(robot.id)" :class="{ active: robot.status === 'charging' }">
             복귀 명령
           </button>
           <button class="action-btn emergency" @click="emergencyStop(robot.id)" :class="{ active: robot.status === 'emergency' }">
@@ -77,7 +84,7 @@ import { ref, onMounted } from 'vue'
 const showModal = ref(false)
 const robots = ref([])
 const loading = ref(true)
-const error = ref(null)
+const error = ref(null) 
 const newRobot = ref({
   name: '',
   ipAddress: '',
@@ -86,7 +93,8 @@ const newRobot = ref({
 
 // 로봇 데이터 로드
 const loadRobots = async () => {
-  loading.value = true
+  console.log('로봇 데이터를 로드합니다...');
+  loading.value = true; // 로딩 상태 시작
   error.value = null
   try {
     // API 호출 로직
@@ -102,11 +110,13 @@ const loadRobots = async () => {
         image: null
       }
     ]
+    console.log('로봇 데이터 로드 성공', robots.value);
   } catch (err) {
     error.value = '로봇 데이터를 불러오는데 실패했습니다.'
     console.error('로봇 데이터 로드 에러:', err)
   } finally {
-    loading.value = false
+    loading.value = false // 로딩 상태 종료
+    console.log('로딩 상태 종료')
   }
 }
 
@@ -174,6 +184,10 @@ const returnRobot = async (robotId) => {
   if (!robotId) return
   try {
     // API 연동 후 구현
+    const robot = robots.value.find(r => r.id === robotId)
+    if (robot) {
+      robot.status = robot.status === 'charging' ? 'idle' : 'charging'
+    }
     console.log('복귀 명령:', robotId)
   } catch (err) {
     console.error('로봇 복귀 명령 에러:', err)
@@ -193,13 +207,27 @@ const emergencyStop = async (robotId) => {
 }
 
 onMounted(() => {
-  loadRobots()
-})
+  loadRobots();
+});
 </script>
 
 <style scoped>
 .robot-management {
   padding: 20px;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  font-size: 1.2em;
+  color: #666;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  font-size: 1.2em;
+  color: #999;
 }
 
 .page-header {
@@ -218,7 +246,14 @@ onMounted(() => {
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 8px;
+}
+
+.add-robot-btn i {
+  display : inline-block;
+  line-height : 1;
 }
 
 .add-robot-btn:hover {
@@ -394,7 +429,7 @@ onMounted(() => {
 .cancel-btn {
   padding: 8px 16px;
   border: 1px solid #ddd;
-  background: white;
+  background: red;
   border-radius: 4px;
   cursor: pointer;
 }
