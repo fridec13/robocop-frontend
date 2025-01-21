@@ -83,6 +83,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import axios from 'axios'
 
 // 상태 관리
 const showModal = ref(false)
@@ -97,24 +98,12 @@ const newRobot = ref({
 
 // 로봇 데이터 로드
 const loadRobots = async () => {
-  console.log('로봇 데이터를 로드합니다...');
   loading.value = true; // 로딩 상태 시작
   error.value = null
   try {
     // API 호출 로직
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    robots.value = [
-      {
-        id: 1,
-        name: 'Robot 1',
-        status: 'active',
-        ipAddress: '192.168.1.101',
-        location: '1층 로비',
-        battery: 85,
-        image: null
-      }
-    ]
-    console.log('로봇 데이터 로드 성공', robots.value);
+    const response = await axios.get('api/v1/robots/')
+    robots.value = response.data.data
   } catch (err) {
     error.value = '로봇 데이터를 불러오는데 실패했습니다.'
     console.error('로봇 데이터 로드 에러:', err)
@@ -146,6 +135,7 @@ const getBatteryColor = (level) => {
 
 // 모달 제어
 const showAddRobotModal = () => {
+  console.log('모달 열기 버튼 클릭')
   showModal.value = true
 }
 
@@ -171,16 +161,26 @@ const handleImageUpload = (event) => {
 }
 
 // 로봇 등록 처리
-const handleAddRobot = () => {
+const handleAddRobot = async () => {
   // API 연동 후 구현
-  robots.value.push({
-    id: robots.value.length + 1,
-    ...newRobot.value,
-    status: 'idle',
-    location: '대기장소',
-    battery: 100
-  })
-  closeModal()
+  try {
+    const formData = new FormData()
+    formData.append('name', newRobot.value.name)
+    formData.append('ip_address', newRobot.value.ipAddress)
+    if (newRobot.value.image) {
+      formData.append('image', newRobot.value.image)
+    }
+
+    const response = await axios.post('/api/v1/robots', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    robots.value.push(response.data.data)
+    closeModal()
+    alert('로봇 등록 성공')
+  } catch (err) {
+    console.error('로봇 등록 실패:', err)
+    alert('로봇 등록에 실패했습니다.')
+  }
 }
 
 // 로봇 제어 함수
