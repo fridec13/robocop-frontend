@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import List, Literal, Optional
 from datetime import datetime
 from ..schemas.responses import BaseResponse, ErrorDetail
+from ..database import db
+from ..models.robot import Robot, Position, BatteryStatus, RobotStatus
 
 router = APIRouter(prefix="/api/v1/robots", tags=["robots"])
 
@@ -72,6 +74,82 @@ class LogResponse(BaseModel):
     routes: Optional[List[RouteLog]] = None
     detections: Optional[List[DetectionInfo]] = None
     pagination: dict
+
+class RobotCreate(BaseModel):
+    name: str
+    ip_address: str
+
+@router.post("", response_model=BaseResponse[Robot])
+async def create_robot(robot_data: RobotCreate):
+    try:
+        # 자동 증가 ID 생성
+        counter = await db.counters.find_one_and_update(
+            {"_id": "robot_id"},
+            {"$inc": {"seq": 1}},
+            return_document=True
+        )
+        
+        robot_id = counter["seq"]
+        
+        # 기본값이 포함된 전체 로봇 데이터 생성
+        robot_dict = {
+            "robot_id": robot_id,  # 자동 생성된 ID 사용
+            "name": robot_data.name,
+            "ip_address": robot_data.ip_address,
+            "status": RobotStatus.IDLE,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "theta": 0.0
+            },
+            "battery": {
+                "level": 100.0,
+                "is_charging": False
+            },
+            "last_active": datetime.now(),
+            "created_at": datetime.now()
+        }
+        
+        # Robot 모델로 변환하여 유효성 검사
+        robot = Robot(**robot_dict)
+            
+        # MongoDB에 저장
+        result = await db.robots.insert_one(robot_dict)
+        
+        if result.inserted_id:
+            return BaseResponse[Robot](
+                status=201,
+                success=True,
+                message="로봇 등록 성공",
+                data=robot
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@router.get("", response_model=BaseResponse[List[Robot]])
+async def get_robots():
+    try:
+        # MongoDB에서 모든 로봇 정보 조회
+        robots = []
+        cursor = db.robots.find({})
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            robots.append(Robot(**doc))
+            
+        return BaseResponse[List[Robot]](
+            status=200,
+            success=True,
+            message="로봇 목록 조회 성공",
+            data=robots
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
 @router.post("/{id}/routes", response_model=BaseResponse[RouteResponse])
 async def set_route(

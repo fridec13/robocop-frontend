@@ -20,8 +20,9 @@ class BatteryStatus(BaseModel):
     is_charging: bool = Field(default=False)  # 충전 중 여부
 
 class Robot(BaseModel):
-    robot_id: str = Field(...)  # 로봇 고유 ID
+    robot_id: int = Field(...)  # 로봇 고유 ID (자동 증가하는 정수)
     name: str = Field(...)  # 로봇 이름
+    ip_address: str = Field(...)  # 로봇 IP 주소
     status: RobotStatus = Field(default=RobotStatus.IDLE)  # 로봇 상태
     position: Position  # 현재 위치
     battery: BatteryStatus  # 배터리 상태
@@ -32,8 +33,9 @@ class Robot(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "robot_id": "robot_001",
+                "robot_id": 1,
                 "name": "Security Bot 1",
+                "ip_address": "192.168.1.100",
                 "status": "idle",
                 "position": {
                     "x": 10.5,

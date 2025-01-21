@@ -24,14 +24,28 @@ cctvs = db.cctvs
 
 async def init_db():
     try:
-        # 컬렉션 생성
-        await db.create_collection("robots")
-        await db.create_collection("persons")
-        await db.create_collection("identification_info")
-        await db.create_collection("maps")
-        await db.create_collection("routes")
-        await db.create_collection("users")
-        await db.create_collection("cctvs")
+        # 시퀀스 컬렉션이 없으면 생성
+        collections = await db.list_collection_names()
+        if "counters" not in collections:
+            await db.create_collection("counters")
+            # 로봇 ID 시퀀스 초기화
+            await db.counters.insert_one({"_id": "robot_id", "seq": 0})
+
+        # 기존 컬렉션 생성
+        if "robots" not in collections:
+            await db.create_collection("robots")
+        if "persons" not in collections:
+            await db.create_collection("persons")
+        if "identification_info" not in collections:
+            await db.create_collection("identification_info")
+        if "maps" not in collections:
+            await db.create_collection("maps")
+        if "routes" not in collections:
+            await db.create_collection("routes")
+        if "users" not in collections:
+            await db.create_collection("users")
+        if "cctvs" not in collections:
+            await db.create_collection("cctvs")
 
         # 인덱스 생성
         # robots 컬렉션 인덱스
