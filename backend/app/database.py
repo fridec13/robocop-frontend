@@ -1,13 +1,15 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from .config import get_settings
 import logging
+import certifi
 
 settings = get_settings()
 
 # MongoDB 클라이언트 생성
 client = AsyncIOMotorClient(
     settings.MONGO_URL,
-    serverSelectionTimeoutMS=5000
+    serverSelectionTimeoutMS=5000,
+    tlsCAFile=certifi.where()
 )
 
 # 데이터베이스 선택
