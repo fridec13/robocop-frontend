@@ -8,28 +8,35 @@
         <h2>ROBOCOP이 만들어갑니다!</h2>
       </div>
     </div>
-    <div class="right-column">
-      <div class="login-form">
-        <h3>아이디</h3>
-        <input type="text" v-model="loginForm.username" placeholder="ID를 입력해주세요">
-        <h3>비밀번호</h3>
-        <input type="password" v-model="loginForm.password" placeholder="비밀번호">
-        <input type="text" v-model="loginForm.captcha" placeholder="캡스워드를 입력해주세요">
-        <button @click="handleLogin" class="login-button">로그인</button>
+    <form @submit.prevent="handleLogin">
+      <div class="right-column">
+        <div class="login-form">
+          <h3>아이디</h3>
+          <input 
+          v-model="loginForm.username" 
+          type="text" 
+          placeholder="ID를 입력해주세요">
+          <h3>비밀번호</h3>
+          <input 
+          v-model="loginForm.password" 
+          type="password"
+          placeholder="비밀번호">
+          <button type="submit" class="login-button">로그인</button>
+        </div>
       </div>
-    </div>
+    </form>
   </div>
 </template>
 192.168.100.103
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 
 const router = useRouter()
 const loginForm = ref({
   username: '',
   password: '',
-  captcha: ''
 })
 
 const isDarkMode = ref(localStorage.getItem('darkMode') === 'true')
@@ -49,19 +56,39 @@ onMounted(() => {
 
 const handleLogin = async () => {
   try {
-    // TODO: 실제 로그인 API 호출로 대체
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 로그인 성공 처리
-    localStorage.setItem('isAuthenticated', 'true')
-    
-    // 대시보드(모니터링)로 이동
-    router.push({ name: 'monitoring' })
+    // FormData 객체 생성
+    const formData = new FormData();
+    formData.append('username', loginForm.value.username);
+    formData.append('password', loginForm.value.password);
+
+    // URLSearchParams 사용
+    const params = new URLSearchParams();
+    params.append('username', loginForm.value.username);
+    params.append('password', loginForm.value.password);
+
+    const response = await axios.post('http://192.168.100.103:8080/api/v1/login', 
+      params,  // FormData 대신 URLSearchParams 사용
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    const { access_token, refresh_token } = response.data;
+
+    // 토큰 저장
+    localStorage.setItem('accessToken', access_token);
+    localStorage.setItem('refreshToken', refresh_token);
+
+    // 로그인 성공 시 대시보드로 이동
+    router.push({ name: 'monitoring' });
+    console.log(access_token, refresh_token)
   } catch (error) {
-    console.error('로그인 실패:', error)
-    alert('로그인에 실패했습니다. 다시 시도해주세요.')
+    console.error('로그인 실패:', error);
+    alert('로그인에 실패했습니다. 다시 시도해주세요.');
   }
-}
+};
 </script>
 
 <style scoped>

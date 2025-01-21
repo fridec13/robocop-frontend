@@ -89,7 +89,7 @@ const router = createRouter({
   ]
 })
 
-// 로그인 상태 체크 네비게이션 가드 추가
+//로그인 상태 체크 네비게이션 가드 추가
 // router.beforeEach((to, from, next) => {
 //   const isAuthenticated = localStorage.getItem('isAuthenticated')
   
