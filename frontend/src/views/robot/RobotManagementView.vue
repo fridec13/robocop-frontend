@@ -101,9 +101,17 @@ const loadRobots = async () => {
   loading.value = true; // 로딩 상태 시작
   error.value = null
   try {
-    // API 호출 로직
-    const response = await axios.get('http://192.168.100.103:8080/api/v1/robots/')
-    robots.value = response.data.data
+    // API 호출 로직 'http://192.168.100.103:8080/api/v1/robots/'
+    const response = await axios.get('http://121.179.165.98:8080/api/v1/robots')
+    robots.value = response.data.data.map((robot) => ({
+      id: robot.id,
+      name: robot.name,
+      ipAddress: robot.ip_address || '알 수 없음',
+      image: robot.image || '/robot-placeholder.png',
+      status: robot.status || 'idle',
+      battery: robot.battery || 100,
+      location: robot.location || '알 수 없음',
+    }))
   } catch (err) {
     error.value = '로봇 데이터를 불러오는데 실패했습니다.'
     console.error('로봇 데이터 로드 에러:', err)
@@ -170,11 +178,22 @@ const handleAddRobot = async () => {
     if (newRobot.value.image) {
       formData.append('image', newRobot.value.image)
     }
-
-    const response = await axios.post('http://192.168.100.103:8080/api/v1/robots', formData, {
+    //'http://192.168.100.103:8080/api/v1/robots'
+    const response = await axios.post('http://121.179.165.98:8080/api/v1/robots', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    robots.value.push(response.data.data)
+    // 반환된 데이터를 로봇 목록에 추가
+    const registeredRobot = response.data.data
+    robots.value.push({
+      id: registeredRobot.id,
+      name: registeredRobot.name,
+      ipAddress: registeredRobot.ip_address,
+      image: registeredRobot.image || '/robot-placeholder.png',
+      status: 'idle',
+      battery: registeredRobot.battery || 100, // 초기 배터리
+      location: registeredRobot.location || '알 수 없음', // 초기 위치
+    });
+
     closeModal()
     alert('로봇 등록 성공')
   } catch (err) {
@@ -188,39 +207,38 @@ const handleAddRobot = async () => {
 const returnRobot = async (robotId) => {
   if (!robotId) return
   try {
-    // 로봇 찾기
-    const robot = robots.value.find(r => r.id === robotId)
-    if (robot) {
-      // 복귀 명령 시, '복귀중' 상태로 변경
-      if (robot.status !== 'charging') {
-        robot.status = 'charging' // 복귀중 상태로 변경
+    const robotIndex = robots.value.findIndex((r) => r.id === robotId);
+    if (robotIndex !== -1) {
+      const updatedRobot = { ...robots.value[robotIndex] }; // 복사본 생성
+      if (updatedRobot.status !== 'charging') {
+        updatedRobot.status = 'charging'; // 상태 변경
       }
+      robots.value.splice(robotIndex, 1, updatedRobot); // 변경된 로봇 객체로 교체
     }
-    console.log('복귀 명령:', robotId)
+    console.log('복귀 명령:', robotId);
   } catch (err) {
-    console.error('로봇 복귀 명령 에러:', err)
+    console.error('로봇 복귀 명령 에러:', err);
   }
-}
+};
 
 // 비상 정지 및 가동 시작 처리
 const emergencyStop = async (robotId) => {
-  if (!robotId) return
+  if (!robotId) return;
   try {
-    const robot = robots.value.find(r => r.id === robotId)
-    if (robot) {
-      // 상태가 'emergency'일 경우 'active'로 변경, 'idle'일 경우 'active'로 바로 변경
-      if (robot.status === 'emergency' || robot.status === 'idle') {
-        robot.status = 'active'
+    const robotIndex = robots.value.findIndex((r) => r.id === robotId);
+    if (robotIndex !== -1) {
+      const updatedRobot = { ...robots.value[robotIndex] }; // 복사본 생성
+      if (updatedRobot.status === 'emergency' || updatedRobot.status === 'idle') {
+        updatedRobot.status = 'active';
       } else {
-        robot.status = robot.status === 'active' ? 'emergency' : 'active'
+        updatedRobot.status = updatedRobot.status === 'active' ? 'emergency' : 'active';
       }
+      robots.value.splice(robotIndex, 1, updatedRobot); // 변경된 로봇 객체로 교체
     }
   } catch (err) {
-    console.error('비상 정지 명령 에러:', err)
+    console.error('비상 정지 명령 에러:', err);
   }
-}
-
-
+};
 
 
 onMounted(() => {

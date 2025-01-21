@@ -27,7 +27,7 @@
     </form>
   </div>
 </template>
-192.168.100.103
+
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -40,11 +40,6 @@ const loginForm = ref({
 })
 
 const isDarkMode = ref(localStorage.getItem('darkMode') === 'true')
-
-const toggleTheme = () => {
-  isDarkMode.value = !isDarkMode.value
-  localStorage.setItem('darkMode', isDarkMode.value)
-}
 
 onMounted(() => {
   // 페이지 로드 시 저장된 테마 설정 적용
@@ -66,7 +61,8 @@ const handleLogin = async () => {
     params.append('username', loginForm.value.username);
     params.append('password', loginForm.value.password);
 
-    const response = await axios.post('http://192.168.100.103:8080/api/v1/auth/login', 
+    const response = await axios.post('http://121.179.165.98:8080/api/v1/auth/login', 
+    //'http://192.168.100.103:8080/api/v1/auth/login'
       params,  // FormData 대신 URLSearchParams 사용
       {
         headers: {
