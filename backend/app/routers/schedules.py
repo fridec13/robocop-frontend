@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
-from ..database import db
+from ..database import db, schedules
 from ..models.schedule import Schedule, ScheduleCreate
 from ..schemas.responses import BaseResponse
 
@@ -29,7 +29,7 @@ async def create_schedule(schedule_data: ScheduleCreate):
             "description": schedule_data.description
         }
         
-        await db.schedules.insert_one(schedule_dict)
+        await schedules.insert_one(schedule_dict)
         
         return {
             "success": True,
@@ -42,11 +42,11 @@ async def create_schedule(schedule_data: ScheduleCreate):
 @router.get("", response_model=BaseResponse[List[Schedule]])
 async def get_schedules():
     try:
-        schedules = await db.schedules.find().to_list(length=None)
+        schedules_list = await schedules.find().to_list(length=None)
         return {
             "success": True,
             "message": "스케줄 목록을 성공적으로 조회했습니다.",
-            "data": [Schedule(**schedule) for schedule in schedules]
+            "data": [Schedule(**schedule) for schedule in schedules_list]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -61,7 +61,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleCreate):
             "description": schedule_data.description
         }
         
-        result = await db.schedules.find_one_and_update(
+        result = await schedules.find_one_and_update(
             {"schedule_id": schedule_id},
             {"$set": schedule_dict},
             return_document=True
@@ -81,7 +81,7 @@ async def update_schedule(schedule_id: int, schedule_data: ScheduleCreate):
 @router.delete("/{schedule_id}", response_model=BaseResponse)
 async def delete_schedule(schedule_id: int):
     try:
-        result = await db.schedules.delete_one({"schedule_id": schedule_id})
+        result = await schedules.delete_one({"schedule_id": schedule_id})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="스케줄을 찾을 수 없습니다.")
         

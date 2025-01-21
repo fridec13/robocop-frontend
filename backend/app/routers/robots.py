@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Path, Query, HTTPException
+from fastapi import APIRouter, Path, Query, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List, Literal, Optional
 from datetime import datetime
 from ..schemas.responses import BaseResponse, ErrorDetail
-from ..database import db
-from ..models.robot import Robot, Position, BatteryStatus, RobotStatus
+from ..database import db, robots
+from ..models.robot import Robot, Position, BatteryStatus, RobotStatus, RobotImage
+import os
+import uuid
 
-router = APIRouter(prefix="/api/v1/robots", tags=["robots"])
+router = APIRouter(prefix="/robots", tags=["robots"])
 
-class Position(BaseModel):
-    x: int
-    y: int
+# 이미지 저장 경로 설정
+UPLOAD_DIR = "storage/robots"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class Waypoint(BaseModel):
     type: Literal["start", "mid", "end"]
@@ -80,23 +82,56 @@ class RobotCreate(BaseModel):
     ip_address: str
 
 @router.post("", response_model=BaseResponse[Robot])
-async def create_robot(robot_data: RobotCreate):
+async def create_robot(
+    name: str = Form(...),
+    ip_address: str = Form(...),
+    image: Optional[UploadFile] = File(None)
+):
     try:
         # 자동 증가 ID 생성
         counter = await db.counters.find_one_and_update(
             {"_id": "robot_id"},
             {"$inc": {"seq": 1}},
+            upsert=True,
             return_document=True
         )
         
         robot_id = counter["seq"]
         
+        # 이미지 처리
+        robot_image = None
+        image_path = None
+        if image:
+            # 파일 확장자 추출
+            ext = os.path.splitext(image.filename)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="지원하지 않는 이미지 형식입니다."
+                )
+            
+            # 이미지 저장
+            image_id = f"robot_{robot_id}_{uuid.uuid4()}{ext}"
+            image_path = os.path.join(UPLOAD_DIR, image_id)
+            
+            # 파일 저장
+            with open(image_path, "wb") as buffer:
+                content = await image.read()
+                buffer.write(content)
+            
+            # RobotImage 모델 생성
+            robot_image = RobotImage(
+                image_id=image_id,
+                url=f"/storage/robots/{image_id}",
+                created_at=datetime.now()
+            )
+        
         # 기본값이 포함된 전체 로봇 데이터 생성
         robot_dict = {
-            "robot_id": robot_id,  # 자동 생성된 ID 사용
-            "name": robot_data.name,
-            "ip_address": robot_data.ip_address,
-            "status": RobotStatus.IDLE,
+            "robot_id": robot_id,
+            "name": name,
+            "ip_address": ip_address,
+            "status": RobotStatus.IDLE.value,
             "position": {
                 "x": 0.0,
                 "y": 0.0,
@@ -106,6 +141,7 @@ async def create_robot(robot_data: RobotCreate):
                 "level": 100.0,
                 "is_charging": False
             },
+            "image": robot_image.dict() if robot_image else None,
             "last_active": datetime.now(),
             "created_at": datetime.now()
         }
@@ -113,17 +149,29 @@ async def create_robot(robot_data: RobotCreate):
         # Robot 모델로 변환하여 유효성 검사
         robot = Robot(**robot_dict)
             
-        # MongoDB에 저장
-        result = await db.robots.insert_one(robot_dict)
+        # MongoDB에 저장 (robots 컬렉션 사용)
+        result = await robots.insert_one(robot_dict)
         
-        if result.inserted_id:
-            return BaseResponse[Robot](
-                status=201,
-                success=True,
-                message="로봇 등록 성공",
-                data=robot
+        if not result.inserted_id:
+            raise HTTPException(
+                status_code=500,
+                detail="로봇 데이터 저장에 실패했습니다."
             )
+        
+        return BaseResponse[Robot](
+            status=201,
+            success=True,
+            message="로봇 등록 성공",
+            data=robot
+        )
+            
     except Exception as e:
+        # 이미지가 저장된 경우 삭제
+        if image_path and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except:
+                pass
         raise HTTPException(
             status_code=400,
             detail=str(e)
@@ -133,17 +181,16 @@ async def create_robot(robot_data: RobotCreate):
 async def get_robots():
     try:
         # MongoDB에서 모든 로봇 정보 조회
-        robots = []
-        cursor = db.robots.find({})
+        robot_list = []
+        cursor = robots.find({})
         async for doc in cursor:
-            doc["id"] = str(doc["_id"])
-            robots.append(Robot(**doc))
+            robot_list.append(Robot(**doc))
             
         return BaseResponse[List[Robot]](
             status=200,
             success=True,
             message="로봇 목록 조회 성공",
-            data=robots
+            data=robot_list
         )
     except Exception as e:
         raise HTTPException(

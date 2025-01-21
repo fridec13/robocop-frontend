@@ -71,6 +71,7 @@ cover/
 # Translations
 *.mo
 
+<<<<<<< HEAD
 # Django stuff:
 
 # Flask stuff:
@@ -172,3 +173,64 @@ cython_debug/
 #.idea/
 
 # End of https://www.toptal.com/developers/gitignore/api/django
+=======
+# Nuxt.js build / generate output
+.nuxt
+
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Storage
+storage/
+uploads/
+
+# MongoDB
+*.mongodb
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover 
+>>>>>>> e604477e637f40415a0527a2d913224e07f1bb84
