@@ -1,25 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth, schedules, robots, persons
 from .database import test_connection
-import uvicorn
-
-
-from fastapi import FastAPI
-from .database import test_connection
-from .routers.auth import create_admin_user
+from .routers.auth import router as auth_router, create_admin_user
+from .routers.schedules import router as schedules_router
+from .routers.robots import router as robots_router
+from .routers.persons import router as persons_router
 
 app = FastAPI()
-
-@app.on_event("startup")
-async def startup_event():
-    await test_connection()
-    await create_admin_user()
-
-# 라우터 등록
-app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
-
-app = FastAPI(title="Robot Management API")
 
 # CORS 설정
 app.add_middleware(
@@ -30,11 +17,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    await test_connection()
+    await create_admin_user()
+
 # 라우터 등록
-app.include_router(auth.router)
-app.include_router(schedules.router)
-app.include_router(robots.router)
-app.include_router(persons.router)
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
+app.include_router(schedules_router, tags=["schedules"])
+app.include_router(robots_router, tags=["robots"])
+app.include_router(persons_router, tags=["persons"])
 
 @app.get("/")
 async def root():
@@ -48,9 +40,5 @@ async def startup_event():
         sys.exit(1)
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    ) 
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True) 

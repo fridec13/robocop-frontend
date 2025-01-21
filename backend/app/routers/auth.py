@@ -1,14 +1,18 @@
 # backend/app/routers/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from ..core.security import (
-    create_access_token, 
-    create_refresh_token, 
+    SECRET_KEY,
+    ALGORITHM,
+    create_access_token,
+    create_refresh_token,
     verify_password,
     get_password_hash
 )
 from ..database import db
-from ..models.user import Token
+from ..models.user import Token, User
+from datetime import datetime
 
 router = APIRouter()
 
@@ -19,7 +23,9 @@ async def create_admin_user():
         admin_user = {
             "username": "admin",
             "password": get_password_hash("admin"),
-            "role": "admin"
+            "role": "admin",
+            "is_active": True,
+            "created_at": datetime.now()
         }
         await db.users.insert_one(admin_user)
 
@@ -43,10 +49,16 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": user["username"]}
     )
 
-    # Refresh 토큰을 DB에 저장
+    # Refresh 토큰을 DB에 저장하고 last_login 업데이트
     await db.users.update_one(
         {"username": user["username"]},
-        {"$set": {"refresh_token": refresh_token}}
+        {
+            "$set": {
+                "refresh_token": refresh_token,
+                "last_login": datetime.now(),
+                "updated_at": datetime.now()
+            }
+        }
     )
 
     return {
@@ -56,19 +68,25 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     }
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str):
+async def refresh_token(current_token: str):
     try:
         # Refresh 토큰 검증
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(current_token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         
         if username is None:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
 
         # DB에서 사용자의 refresh 토큰 확인
         user = await db.users.find_one({"username": username})
-        if not user or user.get("refresh_token") != refresh_token:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        if not user or user.get("refresh_token") != current_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
 
         # 새로운 토큰 생성
         new_access_token = create_access_token(data={"sub": username})
@@ -77,7 +95,12 @@ async def refresh_token(refresh_token: str):
         # 새로운 refresh 토큰을 DB에 저장
         await db.users.update_one(
             {"username": username},
-            {"$set": {"refresh_token": new_refresh_token}}
+            {
+                "$set": {
+                    "refresh_token": new_refresh_token,
+                    "updated_at": datetime.now()
+                }
+            }
         )
 
         return {
@@ -87,4 +110,7 @@ async def refresh_token(refresh_token: str):
         }
 
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )

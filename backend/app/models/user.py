@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 from enum import Enum
@@ -9,23 +9,20 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 class User(BaseModel):
-    user_id: str = Field(...)  # 사용자 고유 ID
-    email: EmailStr = Field(...)  # 이메일
-    password: str = Field(...)  # 비밀번호 (해시된 값)
-    name: str = Field(...)  # 이름
-    role: UserRole = Field(default=UserRole.VIEWER)  # 사용자 역할
-    is_active: bool = Field(default=True)  # 계정 활성화 여부
-    last_login: Optional[datetime] = None  # 마지막 로그인 시간
+    username: str = Field(...)
+    password: str = Field(...)
+    role: UserRole = Field(default=UserRole.VIEWER)
+    refresh_token: Optional[str] = None
+    is_active: bool = Field(default=True)
+    last_login: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
 
     class Config:
         json_schema_extra = {
             "example": {
-                "user_id": "user_001",
-                "email": "admin@example.com",
+                "username": "admin",
                 "password": "hashed_password_value",
-                "name": "Admin User",
                 "role": "admin",
                 "is_active": True,
                 "last_login": "2024-01-20T15:30:00",
@@ -35,7 +32,7 @@ class User(BaseModel):
         }
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     password: str = Field(..., min_length=8)  # 최소 8자리 이상
     name: str
     role: Optional[UserRole] = UserRole.VIEWER
@@ -46,12 +43,19 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
 class UserResponse(BaseModel):
-    user_id: str
-    email: EmailStr
+    username: str
     name: str
     role: UserRole
     is_active: bool

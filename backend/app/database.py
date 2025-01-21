@@ -55,8 +55,8 @@ async def init_db():
         await routes.create_index("route_id", unique=True)
         
         # users 컬렉션 인덱스
-        await users.create_index("user_id", unique=True)
-        await users.create_index("company_seq")
+        await users.create_index("username", unique=True)
+        await users.create_index("refresh_token")
         
         # cctvs 컬렉션 인덱스
         await cctvs.create_index("cctv_id", unique=True)
