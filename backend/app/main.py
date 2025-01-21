@@ -1,50 +1,44 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import websocket, robot, control
-from .config import get_settings
 from .database import test_connection
-import asyncio
+from .routers.auth import router as auth_router, create_admin_user
+from .routers.schedules import router as schedules_router
+from .routers.robots import router as robots_router
+from .routers.persons import router as persons_router
 
 app = FastAPI()
-settings = get_settings()
 
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 실제 운영 환경에서는 구체적인 도메인을 지정해야 합니다
+    allow_origins=["*"],  # 실제 운영 환경에서는 구체적인 origin을 지정해야 합니다
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
-
-# WebSocket CORS 미들웨어
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
-
-# 라우터 등록
-app.include_router(websocket.router)
-app.include_router(robot.router)
-app.include_router(control.router)
 
 @app.on_event("startup")
 async def startup_event():
-    # 데이터베이스 연결 테스트
+    await test_connection()
+    await create_admin_user()
+
+# 라우터 등록
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
+app.include_router(schedules_router, tags=["schedules"])
+app.include_router(robots_router, tags=["robots"])
+app.include_router(persons_router, tags=["persons"])
+
+@app.get("/")
+async def root():
+    return {"message": "Robot Management API"}
+
+@app.on_event("startup")
+async def startup_event():
+    # MongoDB 연결 테스트
     if not await test_connection():
-        print("MongoDB 연결에 실패했습니다. 서버를 종료합니다.")
-        exit(1)
+        import sys
+        sys.exit(1)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=True
-    ) 
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True) 

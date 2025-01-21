@@ -1,35 +1,51 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, List, Dict
+from enum import Enum
 
-class Location(BaseModel):
-    x: float
-    y: float
+class RobotStatus(str, Enum):
+    IDLE = "idle"
+    MOVING = "moving"
+    CHARGING = "charging"
+    ERROR = "error"
+    OFFLINE = "offline"
 
-class RobotStatus(BaseModel):
-    id: str
-    status: str
-    battery: int
-    location: Location
-    current_task: Optional[str]
-    last_updated: datetime
+class Position(BaseModel):
+    x: float = Field(...)
+    y: float = Field(...)
+    theta: float = Field(...)
 
-class SensorData(BaseModel):
-    robot_id: str
-    timestamp: datetime
-    lidar_data: Dict[str, List[Dict[str, float]]]
-    imu_data: Dict[str, Dict[str, float]]
-    position: Dict[str, float]
-
-class CameraFrame(BaseModel):
-    robot_id: str
-    frame_number: int
-    timestamp: datetime
-    image: str  # base64 encoded image
-    status: str
+class BatteryStatus(BaseModel):
+    level: float = Field(..., ge=0, le=100)  # 배터리 잔량 (%)
+    is_charging: bool = Field(default=False)  # 충전 중 여부
 
 class Robot(BaseModel):
-    id: str
-    name: str
-    status: str = "idle"
-    battery_level: int = 100 
+    robot_id: str = Field(...)  # 로봇 고유 ID
+    name: str = Field(...)  # 로봇 이름
+    status: RobotStatus = Field(default=RobotStatus.IDLE)  # 로봇 상태
+    position: Position  # 현재 위치
+    battery: BatteryStatus  # 배터리 상태
+    last_active: datetime = Field(default_factory=datetime.now)  # 마지막 활성 시간
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "robot_id": "robot_001",
+                "name": "Security Bot 1",
+                "status": "idle",
+                "position": {
+                    "x": 10.5,
+                    "y": 20.3,
+                    "theta": 1.57
+                },
+                "battery": {
+                    "level": 85.5,
+                    "is_charging": False
+                },
+                "last_active": "2024-01-20T15:30:00",
+                "created_at": "2024-01-20T00:00:00",
+                "updated_at": "2024-01-20T15:30:00"
+            }
+        } 

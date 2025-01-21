@@ -3,7 +3,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # MongoDB 설정
-    MONGO_URL: str = "mongodb://localhost:27017/?directConnection=true"
+    MONGO_URL: str = "mongodb+srv://maybecold:OBK7Z5K3UYqTiEUp@cluster0.5idlh.mongodb.net/"
     DATABASE_NAME: str = "robocop_db"
     
     # JWT 설정
