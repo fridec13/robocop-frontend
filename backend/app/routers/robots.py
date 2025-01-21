@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Path, Query, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Any
 from datetime import datetime
 from ..schemas.responses import BaseResponse, ErrorDetail
 from ..database import db, robots
 from ..models.robot import Robot, Position, BatteryStatus, RobotStatus, RobotImage
 import os
 import uuid
+import re
 
 router = APIRouter(prefix="/robots", tags=["robots"])
 
@@ -85,9 +86,25 @@ class RobotCreate(BaseModel):
 async def create_robot(
     name: str = Form(...),
     ip_address: str = Form(...),
-    image: Optional[UploadFile] = File(None)
+    image: Optional[Any] = Form(default=None)
 ):
     try:
+        # 로봇 이름 중복 검사
+        existing_robot = await robots.find_one({"name": name})
+        if existing_robot:
+            raise HTTPException(
+                status_code=400,
+                detail="이미 사용 중인 로봇 이름입니다."
+            )
+        
+        # IP 주소 형식 검증
+        ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+        if not re.match(ip_pattern, ip_address):
+            raise HTTPException(
+                status_code=400,
+                detail="유효하지 않은 IP 주소 형식입니다. (예: 192.168.1.100)"
+            )
+
         # 자동 증가 ID 생성
         counter = await db.counters.find_one_and_update(
             {"_id": "robot_id"},
@@ -101,7 +118,9 @@ async def create_robot(
         # 이미지 처리
         robot_image = None
         image_path = None
-        if image:
+        
+        # 이미지가 제공되고 실제 UploadFile인 경우에만 처리
+        if image and isinstance(image, UploadFile):
             # 파일 확장자 추출
             ext = os.path.splitext(image.filename)[1].lower()
             if ext not in ['.jpg', '.jpeg', '.png']:
@@ -114,17 +133,25 @@ async def create_robot(
             image_id = f"robot_{robot_id}_{uuid.uuid4()}{ext}"
             image_path = os.path.join(UPLOAD_DIR, image_id)
             
-            # 파일 저장
-            with open(image_path, "wb") as buffer:
+            try:
+                # 파일 저장
                 content = await image.read()
-                buffer.write(content)
-            
-            # RobotImage 모델 생성
-            robot_image = RobotImage(
-                image_id=image_id,
-                url=f"/storage/robots/{image_id}",
-                created_at=datetime.now()
-            )
+                if content:  # 실제 내용이 있는 경우에만 저장
+                    with open(image_path, "wb") as buffer:
+                        buffer.write(content)
+                    
+                    # RobotImage 모델 생성
+                    robot_image = RobotImage(
+                        image_id=image_id,
+                        url=f"/storage/robots/{image_id}",
+                        created_at=datetime.now()
+                    )
+            except Exception as e:
+                if image_path and os.path.exists(image_path):
+                    os.remove(image_path)
+                print(f"이미지 처리 중 오류 발생: {str(e)}")
+                # 이미지 처리 실패해도 로봇은 생성되도록 함
+                pass
         
         # 기본값이 포함된 전체 로봇 데이터 생성
         robot_dict = {
@@ -153,6 +180,9 @@ async def create_robot(
         result = await robots.insert_one(robot_dict)
         
         if not result.inserted_id:
+            # 저장 실패 시 이미지 삭제
+            if image_path and os.path.exists(image_path):
+                os.remove(image_path)
             raise HTTPException(
                 status_code=500,
                 detail="로봇 데이터 저장에 실패했습니다."

@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 from ..schemas.responses import BaseResponse, ErrorDetail
 from ..database import db, persons  # persons 컬렉션 import
+from ..models.person import Person, PersonCreate, Department, Position, ImageInfo
 import os
 import uuid
 
@@ -29,14 +30,15 @@ class PersonUpdate(BaseModel):
     person_id: int
     person_label: str
 
-@router.post("", response_model=BaseResponse[PersonResponse])
+@router.post("", response_model=BaseResponse[Person])
 async def create_person(
-    person_id: int = Form(...),
-    person_label: str = Form(...),
+    name: str = Form(...),
+    department: Optional[str] = Form(None),
+    position: Optional[str] = Form(None),
     image: UploadFile = File(...)
 ):
     try:
-        # 이미지 처리
+        # 이미지 유효성 검사
         ext = os.path.splitext(image.filename)[1].lower()
         if ext not in ['.jpg', '.jpeg', '.png']:
             raise HTTPException(
@@ -44,38 +46,62 @@ async def create_person(
                 detail="지원하지 않는 이미지 형식입니다."
             )
         
+        # person_id 생성
+        counter = await db.counters.find_one_and_update(
+            {"_id": "person_id"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=True
+        )
+        person_id = counter["seq"]
+        
+        # 이미지 저장
         image_id = f"person_{person_id}_{uuid.uuid4()}{ext}"
         image_path = os.path.join(UPLOAD_DIR, image_id)
         
-        # 파일 저장
         with open(image_path, "wb") as buffer:
             content = await image.read()
             buffer.write(content)
         
-        # 데이터베이스에 저장
+        # 이미지 정보 생성
+        image_info = ImageInfo(
+            imageId=image_id,
+            url=f"/storage/persons/{image_id}",
+            uploadedAt=datetime.now()
+        )
+        
+        # Person 데이터 생성
         person_data = {
-            "person_id": f"person_{person_id}",
-            "label": person_label,
-            "images": [{
-                "imageId": image_id,
-                "url": f"/storage/persons/{image_id}",
-                "uploadedAt": datetime.now()
-            }],
-            "createdAt": datetime.now()
+            "person_id": person_id,
+            "name": name,
+            "department": department,
+            "position": position,
+            "images": [image_info.dict()],
+            "created_at": datetime.now()
         }
         
-        # persons 컬렉션 사용
-        await persons.insert_one(person_data)
+        # 데이터베이스에 저장
+        result = await persons.insert_one(person_data)
         
-        return BaseResponse[PersonResponse](
+        if not result.inserted_id:
+            # 저장 실패 시 이미지 삭제
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            raise HTTPException(
+                status_code=500,
+                detail="데이터베이스 저장에 실패했습니다."
+            )
+        
+        return BaseResponse[Person](
             status=201,
             success=True,
-            message="신원 정보 등록 성공",
-            data=PersonResponse(**person_data)
+            message="신원 정보가 성공적으로 등록되었습니다.",
+            data=Person(**person_data)
         )
+        
     except Exception as e:
-        # 이미지가 저장된 경우 삭제
-        if 'image_path' in locals():
+        # 에러 발생 시 이미지 삭제
+        if 'image_path' in locals() and os.path.exists(image_path):
             try:
                 os.remove(image_path)
             except:
@@ -85,39 +111,111 @@ async def create_person(
             detail=str(e)
         )
 
-@router.get("", response_model=BaseResponse[List[PersonResponse]])
-async def get_persons():
+@router.get("", response_model=BaseResponse[List[Person]])
+async def get_persons(
+    department: Optional[str] = None,
+    position: Optional[str] = None
+):
     try:
-        return BaseResponse[List[PersonResponse]](
+        # 필터 조건 설정
+        filter_query = {}
+        if department:
+            filter_query["department"] = department
+        if position:
+            filter_query["position"] = position
+            
+        # MongoDB에서 조회
+        cursor = persons.find(filter_query)
+        person_list = []
+        async for doc in cursor:
+            person_list.append(Person(**doc))
+            
+        return BaseResponse[List[Person]](
             status=200,
             success=True,
-            message="신원 정보 조회 성공",
-            data=[
-                PersonResponse(
-                    personId="person_1",
-                    label="Test Person",
-                    images=[
-                        ImageInfo(
-                            imageId="img_001",
-                            url="/storage/faces/img_001.jpg",
-                            uploadedAt=datetime.now()
-                        )
-                    ],
-                    createdAt=datetime.now()
-                )
-            ]
+            message="신원 정보 목록을 성공적으로 조회했습니다.",
+            data=person_list
         )
-    except Exception:
-        return BaseResponse[List[PersonResponse]](
-            status=404,
-            success=False,
-            message="신원 정보 조회 실패",
-            errors=[
-                ErrorDetail(
-                    field="database",
-                    message="데이터베이스 연결 오류"
-                )
-            ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@router.post("/{person_id}/images", response_model=BaseResponse[Person])
+async def add_person_image(
+    person_id: int,
+    image: UploadFile = File(...)
+):
+    try:
+        # 사용자 존재 확인
+        person = await persons.find_one({"person_id": person_id})
+        if not person:
+            raise HTTPException(
+                status_code=404,
+                detail="해당 사용자를 찾을 수 없습니다."
+            )
+        
+        # 이미지 처리
+        ext = os.path.splitext(image.filename)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png']:
+            raise HTTPException(
+                status_code=400,
+                detail="지원하지 않는 이미지 형식입니다."
+            )
+        
+        # 이미지 저장
+        image_id = f"person_{person_id}_{uuid.uuid4()}{ext}"
+        image_path = os.path.join(UPLOAD_DIR, image_id)
+        
+        with open(image_path, "wb") as buffer:
+            content = await image.read()
+            buffer.write(content)
+        
+        # 이미지 정보 생성
+        image_info = ImageInfo(
+            imageId=image_id,
+            url=f"/storage/persons/{image_id}",
+            uploadedAt=datetime.now()
+        )
+        
+        # 데이터베이스 업데이트
+        result = await persons.update_one(
+            {"person_id": person_id},
+            {
+                "$push": {"images": image_info.dict()},
+                "$set": {"updated_at": datetime.now()}
+            }
+        )
+        
+        if result.modified_count == 0:
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            raise HTTPException(
+                status_code=500,
+                detail="이미지 정보 업데이트에 실패했습니다."
+            )
+        
+        # 업데이트된 사용자 정보 조회
+        updated_person = await persons.find_one({"person_id": person_id})
+        
+        return BaseResponse[Person](
+            status=200,
+            success=True,
+            message="이미지가 성공적으로 추가되었습니다.",
+            data=Person(**updated_person)
+        )
+        
+    except Exception as e:
+        # 에러 발생 시 이미지 삭제
+        if 'image_path' in locals() and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except:
+                pass
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
         )
 
 @router.put("/{id}", response_model=BaseResponse[PersonResponse])

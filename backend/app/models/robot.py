@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from typing import Optional, List, Dict
 from enum import Enum
+import re
 
 class RobotStatus(str, Enum):
     IDLE = "idle"
@@ -35,6 +36,13 @@ class Robot(BaseModel):
     last_active: datetime = Field(default_factory=datetime.now)  # 마지막 활성 시간
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
+
+    @validator('ip_address')
+    def validate_ip_address(cls, v):
+        pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+        if not re.match(pattern, v):
+            raise ValueError('유효하지 않은 IP 주소 형식입니다. (예: 192.168.1.100)')
+        return v
 
     class Config:
         json_schema_extra = {

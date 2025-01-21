@@ -1,3 +1,5 @@
+# Python Version: 3.10.12
+
 ackermann-msgs==2.0.2
 action-msgs==1.2.1
 action-tutorials-interfaces==0.20.5
@@ -42,7 +44,7 @@ builtin-interfaces==1.2.1
 cartographer-ros-msgs==2.0.9002
 catkin-pkg==1.0.0
 catkin-pkg-modules==1.0.0
-certifi==2020.6.20
+certifi==2023.11.17
 chardet==4.0.0
 click==8.1.8
 colcon-argcomplete==0.3.3
@@ -93,7 +95,7 @@ diagnostic-updater==4.0.0
 distlib==0.3.4
 distro==1.7.0
 distro-info==1.1+ubuntu0.2
-dnspython==2.7.0
+dnspython==2.4.2
 docutils==0.17.1
 domain-coordinator==0.10.0
 dulwich==0.20.31
@@ -110,7 +112,7 @@ examples-rclpy-minimal-publisher==0.15.3
 examples-rclpy-minimal-service==0.15.3
 examples-rclpy-minimal-subscriber==0.15.3
 exceptiongroup==1.2.2
-fastapi==0.115.6
+fastapi==0.109.0
 fastbencode==0.0.5
 fasteners==0.14.1
 fastimport==0.9.14
@@ -170,7 +172,7 @@ mercurial==6.1.1
 message-filters==4.3.5
 monotonic==1.6
 more-itertools==8.10.0
-motor==3.6.1
+motor==3.3.2
 mpi4py==3.1.3
 mpmath==0.0.0
 multidict==6.1.0
@@ -188,7 +190,7 @@ olefile==0.46
 osrf-pycommon==2.1.4
 packaging==21.3
 paramiko==2.9.3
-passlib==1.7.4
+passlib[bcrypt]==1.7.4
 patiencediff==0.2.1
 pcl-msgs==1.0.0
 pendulum-msgs==0.20.5
@@ -205,8 +207,8 @@ pyasn1==0.6.1
 pycairo==1.20.1
 pycodestyle==2.8.0
 pycups==2.0.1
-pydantic==2.10.5
-pydantic-settings==2.7.1
+pydantic==2.5.3
+pydantic-settings==2.1.0
 pydantic_core==2.27.2
 pydocstyle==6.1.1
 pydot==1.4.2
@@ -228,10 +230,10 @@ pytest-cov==3.0.0
 python-apt==2.4.0+ubuntu4
 python-dateutil==2.8.1
 python-debian==0.1.43+ubuntu1.1
-python-dotenv==1.0.1
+python-dotenv==1.0.0
 python-gitlab==2.10.1
-python-jose==3.3.0
-python-multipart==0.0.20
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
 python-qt-binding==1.1.2
 pythran==0.10.0
 pytz==2022.1
@@ -357,7 +359,7 @@ unicodedata2==14.0.0
 unique-identifier-msgs==2.2.1
 urllib3==1.26.5
 usb-creator==0.3.7
-uvicorn==0.34.0
+uvicorn==0.27.0
 vcstool==0.3.0
 vcstools==0.1.42
 velodyne-msgs==2.5.1
@@ -373,3 +375,5 @@ xdg==5
 xkit==0.0.0
 yarl==1.18.3
 zipp==1.0.0
+email-validator==2.1.0.post1
+uuid==1.30

@@ -191,3 +191,28 @@ async def check_password_status(current_user: User = Depends(get_current_user)):
             "is_default_password": current_user["is_default_password"]
         }
     }
+
+@router.post("/logout", response_model=BaseResponse)
+async def logout(current_user = Depends(get_current_user)):
+    try:
+        # 리프레시 토큰 무효화
+        await db.users.update_one(
+            {"username": current_user["username"]},
+            {
+                "$set": {
+                    "refresh_token": None,
+                    "last_logout": datetime.now()
+                }
+            }
+        )
+        
+        return BaseResponse(
+            status=200,
+            success=True,
+            message="로그아웃 되었습니다."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )

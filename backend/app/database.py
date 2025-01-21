@@ -35,6 +35,8 @@ async def init_db():
             await db.counters.insert_one({"_id": "robot_id", "seq": 0})
             # 스케줄 ID 시퀀스 초기화
             await db.counters.insert_one({"_id": "schedule_id", "seq": 0})
+            # 사람 ID 시퀀스 초기화
+            await db.counters.insert_one({"_id": "person_id", "seq": 0})
 
         # 기존 컬렉션 생성
         if "robots" not in collections:
@@ -62,6 +64,8 @@ async def init_db():
         # persons 컬렉션 인덱스
         await persons.create_index("person_id", unique=True)
         await persons.create_index("name")
+        await persons.create_index("department")  # 부서별 검색을 위한 인덱스
+        await persons.create_index("position")    # 직급별 검색을 위한 인덱스
         
         # identification_info 컬렉션 인덱스
         await identification_info.create_index("id_info_id", unique=True)
