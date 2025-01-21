@@ -23,6 +23,7 @@ maps = db.maps
 routes = db.routes
 users = db.users
 cctvs = db.cctvs
+schedules = db.schedules
 
 async def init_db():
     try:
@@ -32,6 +33,8 @@ async def init_db():
             await db.create_collection("counters")
             # 로봇 ID 시퀀스 초기화
             await db.counters.insert_one({"_id": "robot_id", "seq": 0})
+            # 스케줄 ID 시퀀스 초기화
+            await db.counters.insert_one({"_id": "schedule_id", "seq": 0})
 
         # 기존 컬렉션 생성
         if "robots" not in collections:
@@ -48,6 +51,8 @@ async def init_db():
             await db.create_collection("users")
         if "cctvs" not in collections:
             await db.create_collection("cctvs")
+        if "schedules" not in collections:
+            await db.create_collection("schedules")
 
         # 인덱스 생성
         # robots 컬렉션 인덱스
@@ -77,6 +82,11 @@ async def init_db():
         # cctvs 컬렉션 인덱스
         await cctvs.create_index("cctv_id", unique=True)
         await cctvs.create_index([("time_range.start_time", 1), ("time_range.end_time", 1)])
+
+        # schedules 컬렉션 인덱스
+        await schedules.create_index("schedule_id", unique=True)
+        await schedules.create_index([("start_time", 1), ("end_time", 1)])
+        await schedules.create_index("is_active")
 
         logging.info("Database initialized successfully")
         return True

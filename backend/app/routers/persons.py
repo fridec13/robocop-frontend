@@ -3,8 +3,15 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from ..schemas.responses import BaseResponse, ErrorDetail
+from ..database import db, persons  # persons 컬렉션 import
+import os
+import uuid
 
 router = APIRouter(prefix="/api/v1/persons", tags=["persons"])
+
+# 이미지 저장 경로 설정
+UPLOAD_DIR = "storage/persons"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class ImageInfo(BaseModel):
     imageId: str
@@ -29,38 +36,53 @@ async def create_person(
     image: UploadFile = File(...)
 ):
     try:
+        # 이미지 처리
+        ext = os.path.splitext(image.filename)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png']:
+            raise HTTPException(
+                status_code=400,
+                detail="지원하지 않는 이미지 형식입니다."
+            )
+        
+        image_id = f"person_{person_id}_{uuid.uuid4()}{ext}"
+        image_path = os.path.join(UPLOAD_DIR, image_id)
+        
+        # 파일 저장
+        with open(image_path, "wb") as buffer:
+            content = await image.read()
+            buffer.write(content)
+        
+        # 데이터베이스에 저장
+        person_data = {
+            "person_id": f"person_{person_id}",
+            "label": person_label,
+            "images": [{
+                "imageId": image_id,
+                "url": f"/storage/persons/{image_id}",
+                "uploadedAt": datetime.now()
+            }],
+            "createdAt": datetime.now()
+        }
+        
+        # persons 컬렉션 사용
+        await persons.insert_one(person_data)
+        
         return BaseResponse[PersonResponse](
             status=201,
             success=True,
             message="신원 정보 등록 성공",
-            data=PersonResponse(
-                personId=f"person_{person_id}",
-                label=person_label,
-                images=[
-                    ImageInfo(
-                        imageId="img_001",
-                        url="/storage/faces/img_001.jpg",
-                        uploadedAt=datetime.now()
-                    )
-                ],
-                createdAt=datetime.now()
-            )
+            data=PersonResponse(**person_data)
         )
-    except Exception:
-        return BaseResponse[PersonResponse](
-            status=400,
-            success=False,
-            message="신원 정보 등록 실패",
-            errors=[
-                ErrorDetail(
-                    field="image",
-                    message="얼굴이 명확하게 보이지 않는 이미지입니다"
-                ),
-                ErrorDetail(
-                    field="label",
-                    message="이름은 필수 입력 항목입니다"
-                )
-            ]
+    except Exception as e:
+        # 이미지가 저장된 경우 삭제
+        if 'image_path' in locals():
+            try:
+                os.remove(image_path)
+            except:
+                pass
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
         )
 
 @router.get("", response_model=BaseResponse[List[PersonResponse]])

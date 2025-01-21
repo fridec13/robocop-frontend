@@ -26,9 +26,9 @@ async def startup_event():
 
 # 라우터 등록
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(schedules_router, tags=["schedules"])
-app.include_router(robots_router, tags=["robots"])
-app.include_router(persons_router, tags=["persons"])
+app.include_router(schedules_router, prefix="/api/v1", tags=["schedules"])
+app.include_router(robots_router, prefix="/api/v1", tags=["robots"])
+app.include_router(persons_router, prefix="/api/v1", tags=["persons"])
 
 @app.get("/")
 async def root():
