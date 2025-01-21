@@ -11,10 +11,32 @@ from ..core.security import (
     get_password_hash
 )
 from ..database import db
-from ..models.user import Token, User
+from ..models.user import Token, User, PasswordChange, TokenData
+from ..schemas.responses import BaseResponse
 from datetime import datetime
 
 router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    
+    user = await db.users.find_one({"username": token_data.username})
+    if user is None:
+        raise credentials_exception
+    return user
 
 # 초기 관리자 계정 생성 함수
 async def create_admin_user():
@@ -114,3 +136,58 @@ async def refresh_token(current_token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
+
+@router.post("/change-password", response_model=BaseResponse)
+async def change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # 현재 비밀번호 확인
+        if not verify_password(password_data.current_password, current_user["password"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="현재 비밀번호가 일치하지 않습니다."
+            )
+        
+        # 새 비밀번호 확인
+        if password_data.new_password != password_data.confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="새 비밀번호가 일치하지 않습니다."
+            )
+        
+        # 비밀번호 업데이트
+        hashed_password = get_password_hash(password_data.new_password)
+        await db.users.update_one(
+            {"username": current_user["username"]},
+            {
+                "$set": {
+                    "password": hashed_password,
+                    "is_default_password": False,
+                    "updated_at": datetime.now()
+                }
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "비밀번호가 성공적으로 변경되었습니다."
+        }
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/check-password-status", response_model=BaseResponse)
+async def check_password_status(current_user: User = Depends(get_current_user)):
+    return {
+        "success": True,
+        "data": {
+            "is_default_password": current_user["is_default_password"]
+        }
+    }

@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, Optional, List, Any
+from typing import Generic, TypeVar, Optional, List
 from pydantic import BaseModel
 
 T = TypeVar('T')
@@ -8,8 +8,7 @@ class ErrorDetail(BaseModel):
     message: str
 
 class BaseResponse(BaseModel, Generic[T]):
-    status: int
-    success: bool
-    message: str
+    success: bool = True
+    message: Optional[str] = None
     data: Optional[T] = None
     errors: Optional[List[ErrorDetail]] = None 

@@ -1,57 +1,93 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Literal
-from datetime import datetime
-from ..schemas.responses import BaseResponse, ErrorDetail
+from typing import List
+from ..database import db
+from ..models.schedule import Schedule, ScheduleCreate
+from ..schemas.responses import BaseResponse
 
-router = APIRouter(prefix="/api/v1/schedules", tags=["schedules"])
+router = APIRouter(
+    prefix="/schedules",
+    tags=["schedules"]
+)
 
-class Time(BaseModel):
-    hour: int
-    minute: int
-
-class Schedule(BaseModel):
-    time: Time
-    days: List[Literal["sun", "mon", "tue", "wed", "thu", "fri", "sat"]]
-
-class ScheduleRequest(BaseModel):
-    robotId: int
-    schedule: Schedule
-
-class ScheduleResponse(BaseModel):
-    scheduleId: str
-    time: Time
-    days: List[str]
-    createdAt: datetime
-
-@router.post("", response_model=BaseResponse[ScheduleResponse])
-async def create_schedule(request: ScheduleRequest):
+@router.post("", response_model=BaseResponse[Schedule])
+async def create_schedule(schedule_data: ScheduleCreate):
     try:
-        # TODO: 실제 스케줄 저장 로직 구현
-        return BaseResponse[ScheduleResponse](
-            status=201,
-            success=True,
-            message="경비 스케줄 설정 완료",
-            data=ScheduleResponse(
-                scheduleId="12345",
-                time=request.schedule.time,
-                days=request.schedule.days,
-                createdAt=datetime.now()
-            )
+        # 시퀀스 값 증가
+        counter = await db.counters.find_one_and_update(
+            {"_id": "schedule_id"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=True
         )
-    except Exception:
-        return BaseResponse[ScheduleResponse](
-            status=400,
-            success=False,
-            message="스케줄 설정 실패",
-            errors=[
-                ErrorDetail(
-                    field="time",
-                    message="유효하지 않은 시간 형식입니다"
-                ),
-                ErrorDetail(
-                    field="days",
-                    message="최소 하나의 요일을 선택해야 합니다"
-                )
-            ]
-        ) 
+        
+        schedule_dict = {
+            "schedule_id": counter["seq"],
+            "days": [day for day in schedule_data.days],
+            "start_time": schedule_data.start_time.isoformat(),
+            "end_time": schedule_data.end_time.isoformat(),
+            "is_active": True,
+            "description": schedule_data.description
+        }
+        
+        await db.schedules.insert_one(schedule_dict)
+        
+        return {
+            "success": True,
+            "message": "스케줄이 성공적으로 생성되었습니다.",
+            "data": Schedule(**schedule_dict)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("", response_model=BaseResponse[List[Schedule]])
+async def get_schedules():
+    try:
+        schedules = await db.schedules.find().to_list(length=None)
+        return {
+            "success": True,
+            "message": "스케줄 목록을 성공적으로 조회했습니다.",
+            "data": [Schedule(**schedule) for schedule in schedules]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{schedule_id}", response_model=BaseResponse[Schedule])
+async def update_schedule(schedule_id: int, schedule_data: ScheduleCreate):
+    try:
+        schedule_dict = {
+            "days": [day for day in schedule_data.days],
+            "start_time": schedule_data.start_time.isoformat(),
+            "end_time": schedule_data.end_time.isoformat(),
+            "description": schedule_data.description
+        }
+        
+        result = await db.schedules.find_one_and_update(
+            {"schedule_id": schedule_id},
+            {"$set": schedule_dict},
+            return_document=True
+        )
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="스케줄을 찾을 수 없습니다.")
+        
+        return {
+            "success": True,
+            "message": "스케줄이 성공적으로 수정되었습니다.",
+            "data": Schedule(**result)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{schedule_id}", response_model=BaseResponse)
+async def delete_schedule(schedule_id: int):
+    try:
+        result = await db.schedules.delete_one({"schedule_id": schedule_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="스케줄을 찾을 수 없습니다.")
+        
+        return {
+            "success": True,
+            "message": "스케줄이 성공적으로 삭제되었습니다."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

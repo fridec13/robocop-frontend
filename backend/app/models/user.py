@@ -9,11 +9,12 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 class User(BaseModel):
-    username: str = Field(...)
-    password: str = Field(...)
-    role: UserRole = Field(default=UserRole.VIEWER)
-    refresh_token: Optional[str] = None
-    is_active: bool = Field(default=True)
+    user_id: int = Field(...)
+    username: str
+    password: str
+    role: UserRole
+    is_active: bool = True
+    is_default_password: bool = True  # 기본 비밀번호 사용 여부
     last_login: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
@@ -21,13 +22,15 @@ class User(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
+                "user_id": 1,
                 "username": "admin",
-                "password": "hashed_password_value",
-                "role": "admin",
+                "password": "hashed_password",
+                "role": "ADMIN",
                 "is_active": True,
-                "last_login": "2024-01-20T15:30:00",
+                "is_default_password": True,
+                "last_login": "2024-01-20T00:00:00",
                 "created_at": "2024-01-20T00:00:00",
-                "updated_at": "2024-01-20T15:30:00"
+                "updated_at": "2024-01-20T12:00:00"
             }
         }
 
@@ -61,4 +64,9 @@ class UserResponse(BaseModel):
     is_active: bool
     last_login: Optional[datetime]
     created_at: datetime
-    updated_at: Optional[datetime] 
+    updated_at: Optional[datetime]
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str 
