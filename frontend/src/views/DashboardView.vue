@@ -185,7 +185,8 @@ const menuItems = [
       { id: 'robot-management', name: '로봇 관리' },
       { id: 'robot-control', name: '로봇 제어' },
       { id: 'course-management', name: '경로 관리' },
-      { id: 'sensor-data', name: '센서 데이터' }
+      { id: 'sensor-data', name: '센서 데이터' },
+      { id: 'robot-control-test', name: '로봇 제어 테스트' }
     ]
   },
   {
