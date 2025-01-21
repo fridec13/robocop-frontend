@@ -66,7 +66,7 @@ const handleLogin = async () => {
     params.append('username', loginForm.value.username);
     params.append('password', loginForm.value.password);
 
-    const response = await axios.post('http://192.168.100.103:8080/api/v1/login', 
+    const response = await axios.post('http://192.168.100.103:8080/api/v1/auth/login', 
       params,  // FormData 대신 URLSearchParams 사용
       {
         headers: {
