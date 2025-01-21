@@ -102,7 +102,7 @@ const loadRobots = async () => {
   error.value = null
   try {
     // API 호출 로직
-    const response = await axios.get('api/v1/robots/')
+    const response = await axios.get('http://192.168.100.103:8080/api/v1/robots/')
     robots.value = response.data.data
   } catch (err) {
     error.value = '로봇 데이터를 불러오는데 실패했습니다.'
@@ -171,7 +171,7 @@ const handleAddRobot = async () => {
       formData.append('image', newRobot.value.image)
     }
 
-    const response = await axios.post('/api/v1/robots', formData, {
+    const response = await axios.post('http://192.168.100.103:8080/api/v1/robots', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     robots.value.push(response.data.data)
