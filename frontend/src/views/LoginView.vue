@@ -1,10 +1,5 @@
 <template>
   <div class="login-container" :class="{ 'dark-mode': isDarkMode }">
-    <div class="theme-toggle">
-      <button @click="toggleTheme" class="theme-button">
-        {{ isDarkMode ? '🌞' : '🌙' }}
-      </button>
-    </div>
     <div class="left-column">
       <img src="@/assets/logo.png" alt="Robocop Logo" class="logo">
       <div class="slogan">
@@ -25,7 +20,7 @@
     </div>
   </div>
 </template>
-
+192.168.100.103
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'

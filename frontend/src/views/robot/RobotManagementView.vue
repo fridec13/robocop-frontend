@@ -43,9 +43,13 @@
           <button class="action-btn return" @click="returnRobot(robot.id)" :class="{ active: robot.status === 'charging' }">
             복귀 명령
           </button>
-          <button class="action-btn emergency" @click="emergencyStop(robot.id)" :class="{ active: robot.status === 'emergency' }">
-            비상 정지
+          <button v-if="robot.status === 'active'" class="action-btn emergency" @click="emergencyStop(robot.id)" :class="{ active: robot.status === 'emergency' }">
+           비상 정지
           </button>
+          <button v-else class="action-btn active" @click="emergencyStop(robot.id)" :class="{ active: robot.status === 'active' }">
+            가동 시작
+          </button>
+
         </div>
       </div>
     </div>
@@ -180,13 +184,17 @@ const handleAddRobot = () => {
 }
 
 // 로봇 제어 함수
+// 복귀 명령 처리
 const returnRobot = async (robotId) => {
   if (!robotId) return
   try {
-    // API 연동 후 구현
+    // 로봇 찾기
     const robot = robots.value.find(r => r.id === robotId)
     if (robot) {
-      robot.status = robot.status === 'charging' ? 'idle' : 'charging'
+      // 복귀 명령 시, '복귀중' 상태로 변경
+      if (robot.status !== 'charging') {
+        robot.status = 'charging' // 복귀중 상태로 변경
+      }
     }
     console.log('복귀 명령:', robotId)
   } catch (err) {
@@ -194,17 +202,26 @@ const returnRobot = async (robotId) => {
   }
 }
 
+// 비상 정지 및 가동 시작 처리
 const emergencyStop = async (robotId) => {
   if (!robotId) return
   try {
     const robot = robots.value.find(r => r.id === robotId)
     if (robot) {
-      robot.status = robot.status === 'emergency' ? 'idle' : 'emergency'
+      // 상태가 'emergency'일 경우 'active'로 변경, 'idle'일 경우 'active'로 바로 변경
+      if (robot.status === 'emergency' || robot.status === 'idle') {
+        robot.status = 'active'
+      } else {
+        robot.status = robot.status === 'active' ? 'emergency' : 'active'
+      }
     }
   } catch (err) {
     console.error('비상 정지 명령 에러:', err)
   }
 }
+
+
+
 
 onMounted(() => {
   loadRobots();

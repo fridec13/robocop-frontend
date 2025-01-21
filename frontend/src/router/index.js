@@ -12,7 +12,6 @@ import StatsSummary from '@/components/dashboard/stats/StatsSummary.vue'
 import VideoList from '@/components/dashboard/stats/VideoList.vue'
 import Settings from '@/components/dashboard/settings/Settings.vue'
 import MapView from '@/components/dashboard/monitoring/MapView.vue'
-import RobotControlTest from '@/components/RobotControl/RobotControlTest.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -86,30 +85,21 @@ const router = createRouter({
           component: Settings
         }
       ]
-    },
-    {
-      path: '/robot/control-test',
-      name: 'RobotControlTest',
-      component: RobotControlTest,
-      meta: {
-        title: '로봇 제어 테스트',
-        requiresAuth: true  // 필요한 경우 인증 요구사항 설정
-      }
     }
   ]
 })
 
 // 로그인 상태 체크 네비게이션 가드 추가
-router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated')
+// router.beforeEach((to, from, next) => {
+//   const isAuthenticated = localStorage.getItem('isAuthenticated')
   
-  if (to.name !== 'login' && !isAuthenticated) {
-    next({ name: 'login' })
-  } else if (to.name === 'login' && isAuthenticated) {
-    next({ name: 'monitoring' })
-  } else {
-    next()
-  }
-})
+//   if (to.name !== 'login' && !isAuthenticated) {
+//     next({ name: 'login' })
+//   } else if (to.name === 'login' && isAuthenticated) {
+//     next({ name: 'monitoring' })
+//   } else {
+//     next()
+//   }
+// })
 
 export default router
