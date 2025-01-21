@@ -1,42 +1,39 @@
-from pydantic import BaseModel, Field
-from datetime import datetime, time
-from typing import List, Optional
 from enum import Enum
+from pydantic import BaseModel, Field
+from datetime import time
+from typing import List, Optional
 
-class WeekDay(str, Enum):
-    MON = "mon"
-    TUE = "tue"
-    WED = "wed"
-    THU = "thu"
-    FRI = "fri"
-    SAT = "sat"
-    SUN = "sun"
-
-class ScheduleTime(BaseModel):
-    hour: int = Field(..., ge=0, le=23)
-    minute: int = Field(..., ge=0, le=59)
+class DayOfWeek(str, Enum):
+    MONDAY = "MONDAY"
+    TUESDAY = "TUESDAY"
+    WEDNESDAY = "WEDNESDAY"
+    THURSDAY = "THURSDAY"
+    FRIDAY = "FRIDAY"
+    SATURDAY = "SATURDAY"
+    SUNDAY = "SUNDAY"
 
 class Schedule(BaseModel):
-    schedule_id: str = Field(...)  # 스케줄 고유 ID
-    robot_id: str = Field(...)  # 로봇 ID
-    time: ScheduleTime  # 실행 시간
-    days: List[WeekDay]  # 실행 요일
-    is_active: bool = Field(default=True)  # 활성화 여부
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: Optional[datetime] = None
+    schedule_id: int = Field(...)  # 자동 증가하는 정수
+    days: List[DayOfWeek]  # 실행할 요일 목록
+    start_time: time  # 작업 시작 시간 (HH:MM)
+    end_time: time  # 작업 종료 시간 (HH:MM)
+    is_active: bool = True  # 스케줄 활성화 여부
+    description: Optional[str] = None  # 스케줄 설명
 
     class Config:
         json_schema_extra = {
             "example": {
-                "schedule_id": "schedule_001",
-                "robot_id": "robot_001",
-                "time": {
-                    "hour": 14,
-                    "minute": 30
-                },
-                "days": ["mon", "wed", "fri"],
+                "schedule_id": 1,
+                "days": ["MONDAY", "WEDNESDAY", "FRIDAY"],
+                "start_time": "09:00",
+                "end_time": "18:00",
                 "is_active": True,
-                "created_at": "2024-01-20T00:00:00",
-                "updated_at": "2024-01-20T12:00:00"
+                "description": "주간 순찰 스케줄"
             }
-        } 
+        }
+
+class ScheduleCreate(BaseModel):
+    days: List[DayOfWeek]
+    start_time: time
+    end_time: time
+    description: Optional[str] = None 

@@ -5,8 +5,10 @@ from .routers.auth import router as auth_router, create_admin_user
 from .routers.schedules import router as schedules_router
 from .routers.robots import router as robots_router
 from .routers.persons import router as persons_router
+from .config import get_settings
 
 app = FastAPI()
+settings = get_settings()
 
 # CORS 설정
 app.add_middleware(
@@ -23,7 +25,7 @@ async def startup_event():
     await create_admin_user()
 
 # 라우터 등록
-app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(schedules_router, tags=["schedules"])
 app.include_router(robots_router, tags=["robots"])
 app.include_router(persons_router, tags=["persons"])
@@ -41,4 +43,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=True) 
